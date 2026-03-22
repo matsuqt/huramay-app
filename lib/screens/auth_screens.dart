@@ -8,7 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../globals.dart';
 import '../utils/ui_helpers.dart';
 import 'dashboard_screen.dart';
-import 'admin_dashboard.dart'; // NEW: Added import for the Admin routing
+import 'admin_dashboard.dart'; 
 
 // ==================== AUTH & PROFILE SCREENS ====================
 class LoginScreen extends StatefulWidget {
@@ -23,23 +23,28 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> doLogin() async {
     try {
-      // UPDATED: Using $baseUrl here so it connects to 192.168.1.9!
       var res = await http.post(
-        Uri.parse('$baseUrl/login'),
+        Uri.parse('http://10.33.87.39:5000/api/login'), 
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': _emailCtrl.text, 'password': _passCtrl.text}),
       );
-      
       var data = jsonDecode(res.body);
+      
       if (res.statusCode == 200) {
         currentUser = data;
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const DashboardScreen()));
+        
+        bool isAdmin = data['is_admin'] ?? false;
+
+        if (isAdmin) {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const AdminDashboard()));
+        } else {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const DashboardScreen()));
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'])));
       }
     } catch (e) {
-      // UPDATED: This will now tell us the exact error instead of hiding it!
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Connection Error")));
     }
   }
 
@@ -102,42 +107,34 @@ class _SignUpScreenState extends State<SignUpScreen> {
   ];
 
   Future<void> doSignup() async {
-    // 1. Check if department is missing
-    if (_selectedDept == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a department!")));
-      return;
-    }
-    // 2. Check if passwords match
-    if (_passCtrl.text != _confCtrl.text) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Passwords do not match!")));
-      return;
+    // TICKET VAVT-64: Enforce @gmail.com extension
+    String emailInput = _emailCtrl.text.trim().toLowerCase();
+    if (!emailInput.endsWith('@gmail.com')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Not an email address extension.")),
+      );
+      return; // Stop the signup process right here
     }
 
+    if (_selectedDept == null || _passCtrl.text != _confCtrl.text) return;
+    
     try {
-      // 3. Send to backend (Make sure we use baseUrl here so it uses your Wi-Fi IP!)
       var res = await http.post(
-        Uri.parse('$baseUrl/register'), 
+        Uri.parse('http://10.33.87.39:5000/api/register'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'full_name': _nameCtrl.text, 
-          'email': _emailCtrl.text, 
-          'department': _selectedDept, 
-          'password': _passCtrl.text
-        }),
+        body: jsonEncode({'full_name': _nameCtrl.text, 'email': emailInput, 'department': _selectedDept, 'password': _passCtrl.text}),
       );
       
-      // 4. Handle Backend Response
       if (res.statusCode == 201) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Success! You can now log in.")));
-        Navigator.pop(context); // Go back to login screen
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Account created! Please log in.")));
       } else {
+        // PRO FIX: Actually show the user why it failed (e.g. Email already exists)
         var data = jsonDecode(res.body);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Server said: ${data['message']}")));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'])));
       }
     } catch (e) {
-      // 5. Catch Network/Wi-Fi Errors
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Connection Error: Check Wi-Fi or IP")));
-      print("Error details: $e");
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Connection Error")));
     }
   }
 
@@ -222,7 +219,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _saveProfile() async {
     try {
       var res = await http.post(
-        Uri.parse('$baseUrl/api/user/update'), // UPDATED: Using baseUrl
+        Uri.parse('http://10.33.87.39:5000/api/user/update'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'id': currentUser!['id'], 'photo_path': _localPhotoPath ?? ""}),
       );
@@ -339,7 +336,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty || _passCtrl.text != _confCtrl.text) return;
     try {
       var res = await http.post(
-        Uri.parse('$baseUrl/api/user/reset_password'), // UPDATED: Using baseUrl
+        Uri.parse('http://10.33.87.39:5000/api/user/reset_password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': _emailCtrl.text, 'new_password': _passCtrl.text, 'current_user_id': currentUser!['id']}),
       );

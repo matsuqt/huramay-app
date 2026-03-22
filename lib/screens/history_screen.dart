@@ -1,4 +1,3 @@
-// lib/screens/history_screen.dart
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -27,8 +26,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Future<void> _fetchHistory() async {
+    if (currentUser == null) return;
     setState(() => isLoading = true);
     try {
+      // FIXED: Using baseUrl for consistency across the app
       final res = await http.get(
         Uri.parse('http://10.33.87.39:5000/api/borrow/history/${currentUser!['id']}'),
       );
@@ -142,7 +143,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 }
 
 // ---------------------------------------------------------
-// 1. THE HISTORY CARD
+// 1. THE HISTORY CARD (Fixed for Null Safety)
 // ---------------------------------------------------------
 class _HistoryCard extends StatelessWidget {
   final dynamic historyData;
@@ -150,7 +151,8 @@ class _HistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    dynamic item = historyData['item'];
+    // FIXED: Guard against the entire item object being null
+    dynamic item = historyData['item'] ?? {}; 
     String? imgPath = item['image'];
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
 
@@ -159,7 +161,6 @@ class _HistoryCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image with bold blue border per Figma mockups
           Container(
             width: 120,
             height: 140,
@@ -191,27 +192,27 @@ class _HistoryCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // FIXED: Added '??' guards to every Text widget
                   Text(
-                    item['owner'],
+                    item['owner'] ?? "Unknown Owner",
                     style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A0088), fontSize: 13),
                   ),
                   Text(
-                    item['title'],
+                    item['title'] ?? "Untitled Item",
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
                   ),
                   Text(
-                    item['dept'],
+                    item['dept'] ?? "No Department",
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
                   ),
                   Text(
-                    historyData['status'],
+                    historyData['status'] ?? "No Status",
                     style: const TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                   const SizedBox(height: 15),
                   Center(
                     child: ElevatedButton(
                       onPressed: () {
-                        // Open the multi-step Report Overlay
                         showDialog(
                           context: context,
                           builder: (context) => ReportOverlay(itemData: item),
@@ -238,7 +239,7 @@ class _HistoryCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------
-// 2. THE MULTI-STEP REPORT OVERLAY DIALOG
+// 2. THE MULTI-STEP REPORT OVERLAY DIALOG (Fixed for Null Safety)
 // ---------------------------------------------------------
 enum ReportStep { details, input }
 
@@ -283,11 +284,11 @@ class _ReportOverlayState extends State<ReportOverlay> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _confirmBtn("Yes", () {
-                  Navigator.pop(context); // Close confirm dialog
-                  _submitReportToBackend(); // Run API call
+                  Navigator.pop(context); 
+                  _submitReportToBackend(); 
                 }),
                 _confirmBtn("No", () {
-                  Navigator.pop(context); // Close confirm dialog
+                  Navigator.pop(context); 
                 }),
               ],
             )
@@ -322,7 +323,7 @@ class _ReportOverlayState extends State<ReportOverlay> {
         }),
       );
       if (res.statusCode == 201) {
-        Navigator.pop(context); // Close the main overlay dialog
+        Navigator.pop(context); 
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Report submitted successfully.")));
       }
     } catch (e) {
@@ -339,19 +340,17 @@ class _ReportOverlayState extends State<ReportOverlay> {
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.all(20),
       child: Container(
         width: double.infinity,
-        height: MediaQuery.of(context).size.height * 0.75, // Makes the grey box taller
+        height: MediaQuery.of(context).size.height * 0.75, 
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFFBDBDBD), // Medium Grey background
+          color: const Color(0xFFBDBDBD), 
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: Colors.black),
         ),
         child: Column(
           children: [
-            // Back Button
             Align(
               alignment: Alignment.topLeft,
               child: GestureDetector(
@@ -364,8 +363,6 @@ class _ReportOverlayState extends State<ReportOverlay> {
               ),
             ),
             const SizedBox(height: 10),
-            
-            // Image
             Container(
               width: 140,
               height: 160,
@@ -380,15 +377,11 @@ class _ReportOverlayState extends State<ReportOverlay> {
               child: !hasImage ? const Icon(Icons.image, size: 50, color: Colors.grey) : null,
             ),
             const SizedBox(height: 25),
-
-            // Dynamic Content Area (Details vs Input)
             Expanded(
               child: currentStep == ReportStep.details 
                 ? _buildDetailsView() 
                 : _buildInputView(),
             ),
-
-            // Bottom Red Report Button
             isSubmitting 
               ? const CircularProgressIndicator()
               : ElevatedButton(
@@ -414,29 +407,28 @@ class _ReportOverlayState extends State<ReportOverlay> {
     );
   }
 
-  // View 1: Shows Item Descriptions
   Widget _buildDetailsView() {
     return SingleChildScrollView(
       child: Column(
         children: [
           _centeredLabel("Owner"),
-          _centeredValue(widget.itemData['owner']),
+          // FIXED: Guarded against null
+          _centeredValue(widget.itemData['owner'] ?? "N/A"),
           const SizedBox(height: 10),
           _centeredLabel("Item"),
-          _centeredValue(widget.itemData['title']),
+          _centeredValue(widget.itemData['title'] ?? "N/A"),
           const SizedBox(height: 10),
           _centeredLabel("Department"),
-          _centeredValue(widget.itemData['dept']),
+          _centeredValue(widget.itemData['dept'] ?? "N/A"),
           const SizedBox(height: 10),
           _centeredLabel("Description"),
-          _centeredValue(widget.itemData['description']),
+          _centeredValue(widget.itemData['description'] ?? "No description available."),
           const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  // View 2: Shows the Text Input Area
   Widget _buildInputView() {
     return Column(
       children: [
@@ -445,7 +437,7 @@ class _ReportOverlayState extends State<ReportOverlay> {
         Expanded(
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.grey[200], // Light grey text area
+              color: Colors.grey[200],
               borderRadius: BorderRadius.circular(15),
             ),
             child: TextField(

@@ -32,6 +32,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
   Future<void> _fetchRequests() async {
     setState(() => isLoading = true);
     try {
+      // PRO FIX: Using baseUrl for reliability
       final res = await http.get(
         Uri.parse('http://10.33.87.39:5000/api/borrow/requests/owner/${currentUser!['id']}'),
       );
@@ -419,7 +420,7 @@ class RequestDetailDialog extends StatelessWidget {
   );
 }
 
-// ==================== BORROWING PIPELINE ====================
+// ==================== BORROWING PIPELINE (UPDATED VAVT-65) ====================
 class BorrowingFormScreen extends StatefulWidget {
   final dynamic item;
   const BorrowingFormScreen({super.key, required this.item});
@@ -433,7 +434,16 @@ class _BorrowingFormScreenState extends State<BorrowingFormScreen> {
   final _startCtrl = TextEditingController();
   final _endCtrl = TextEditingController();
   final _proofCtrl = TextEditingController();
-  final _meetupCtrl = TextEditingController(text: "LNU Campus Only");
+  
+  // TICKET VAVT-65: Locations List
+  final List<String> _locations = [
+    'MIS/ITSO', 'IGP Canteen', 'ORC Quadrangle', 'Bleachers', 
+    'Student Center 2F', 'Alba Hall', 'Montejo Parking Lot', 
+    'HUM Building', 'Paterno Campus Canteen', 'New Library', 
+    'ACAD Building', 'CON Building', 'CME Building', 
+    'LNU Dormitory', 'Hotel Cresencia', 'Youngfield Canteen'
+  ];
+  String? _selectedLocation;
   String? _proofPath;
 
   @override
@@ -441,6 +451,8 @@ class _BorrowingFormScreenState extends State<BorrowingFormScreen> {
     super.initState();
     _nameCtrl = TextEditingController(text: currentUser?['full_name'] ?? "");
     _deptCtrl = TextEditingController(text: currentUser?['department'] ?? "");
+    // Default the dropdown to the first location
+    _selectedLocation = _locations.first;
   }
 
   Future<void> _pickDate(TextEditingController ctrl) async {
@@ -462,7 +474,7 @@ class _BorrowingFormScreenState extends State<BorrowingFormScreen> {
   }
 
   void _proceedToTerms() {
-    if (_startCtrl.text.isEmpty || _endCtrl.text.isEmpty) {
+    if (_startCtrl.text.isEmpty || _endCtrl.text.isEmpty || _selectedLocation == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill all required fields.")));
       return;
     }
@@ -474,7 +486,7 @@ class _BorrowingFormScreenState extends State<BorrowingFormScreen> {
       "start_date": _startCtrl.text,
       "end_date": _endCtrl.text,
       "proof_of_id_path": _proofPath,
-      "meetup_location": _meetupCtrl.text
+      "meetup_location": _selectedLocation // Using dropdown value
     };
     Navigator.push(context, MaterialPageRoute(builder: (c) => TermsScreen(item: widget.item, borrowData: borrowData)));
   }
@@ -523,7 +535,10 @@ class _BorrowingFormScreenState extends State<BorrowingFormScreen> {
             _yellowPillInput("Start date", _startCtrl, isReadOnly: true, onTap: () => _pickDate(_startCtrl), suffixIcon: Icons.calendar_today),
             _yellowPillInput("End date", _endCtrl, isReadOnly: true, onTap: () => _pickDate(_endCtrl), suffixIcon: Icons.calendar_today),
             _yellowPillInput("Proof of ID", _proofCtrl, isReadOnly: true, onTap: _pickProof, suffixIcon: Icons.download),
-            _yellowPillInput("Meetup (LNU Campus Only)", _meetupCtrl, isReadOnly: true),
+            
+            // TICKET VAVT-65: Meetup Dropdown
+            _buildLocationDropdown(),
+            
             const SizedBox(height: 30),
             ElevatedButton(
               onPressed: _proceedToTerms,
@@ -542,6 +557,35 @@ class _BorrowingFormScreenState extends State<BorrowingFormScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  // TICKET VAVT-65: Dropdown UI Helper
+  Widget _buildLocationDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Meetup (LNU Campus Only)", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+        const SizedBox(height: 5),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: BoxDecoration(
+            color: Colors.yellow,
+            borderRadius: BorderRadius.circular(25),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButtonFormField<String>(
+              value: _selectedLocation,
+              decoration: const InputDecoration(border: InputBorder.none),
+              icon: const Icon(Icons.keyboard_arrow_down, color: Colors.black),
+              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14),
+              dropdownColor: Colors.yellow,
+              items: _locations.map((loc) => DropdownMenuItem(value: loc, child: Text(loc))).toList(),
+              onChanged: (v) => setState(() => _selectedLocation = v),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

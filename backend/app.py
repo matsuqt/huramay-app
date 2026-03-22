@@ -77,6 +77,10 @@ class ReportItem(db.Model):
     report_text = db.Column(db.Text, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Added relationships so we can easily fetch the user and item data
+    reporter = db.relationship('User')
+    item = db.relationship('Item')
+
 with app.app_context():
     db.create_all()
 
@@ -105,7 +109,7 @@ def login():
             "id": user.id, "full_name": user.full_name, "email": user.email,               
             "department": user.department, "photo_path": user.photo_path,     
             "rating": user.rating, 
-            "is_admin": user.email == 'admin@lnu.edu.ph', # ADDED: Admin verification flag
+            "is_admin": user.email == 'admin@lnu.edu.ph',
             "message": "Login successful!"
         }), 200
     return jsonify({"message": "Invalid email or password"}), 401
@@ -280,6 +284,8 @@ def update_request_status(req_id):
     db.session.commit()
     return jsonify({"message": f"Request {new_status} successfully!"}), 200
 
+
+# TICKET VAVT-63: Submitting a report
 @app.route('/api/report', methods=['POST'])
 def submit_report():
     try:
@@ -294,6 +300,40 @@ def submit_report():
         return jsonify({"message": "Report submitted successfully!"}), 201
     except Exception as e:
         return jsonify({"message": f"Server Error: {str(e)}"}), 500
+
+# TICKET VAVT-63: Fetching ALL items that have reports (Community View)
+@app.route('/api/reports/all', methods=['GET'])
+def get_all_reports():
+    try:
+        # Fetch all reports, ordered by newest first
+        reports = ReportItem.query.order_by(ReportItem.timestamp.desc()).all()
+        
+        results = []
+        for r in reports:
+            # Check if item exists (in case it was deleted)
+            if r.item and r.reporter:
+                
+                # NEW: Safely handle the timestamp so it never crashes!
+                time_str = ""
+                if hasattr(r.timestamp, 'strftime'):
+                    time_str = r.timestamp.strftime("%b %d, %Y")
+                else:
+                    time_str = str(r.timestamp)[:10] # Just grabs the YYYY-MM-DD
+                
+                results.append({
+                    "report_id": r.id,
+                    "report_text": r.report_text,
+                    "timestamp": time_str,
+                    "reporter_name": r.reporter.full_name,
+                    "reporter_dept": r.reporter.department,
+                    "item_title": r.item.title,
+                    "item_image": r.item.item_image_path
+                })
+                
+        return jsonify(results), 200
+    except Exception as e:
+        print(f"CRITICAL ERROR IN REPORTS: {e}")
+        return jsonify({"message": str(e)}), 500
 
 # --- CHATS / MESSAGING ROUTES ---
 @app.route('/api/messages/inbox/<int:user_id>', methods=['GET'])
@@ -388,7 +428,6 @@ def ban_user(user_id):
 def _item_to_dict(i):
     if not i: return {}
     
-    # PRO TIP: This makes sure the status text matches our Flutter logic case-insensitively
     return {
         "id": i.id,
         "title": i.title,
