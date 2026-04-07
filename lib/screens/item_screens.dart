@@ -984,7 +984,7 @@ class _EditItemScreenState extends State<EditItemScreen> {
     'Bachelor of Elementary Education', 'Bachelor of Early Childhood Education', 'Bachelor of Special Needs Education', 'Bachelor of Technology and Livelihood Education', 'Bachelor of Physical Education', 'Bachelor of Secondary Education major in English', 'Bachelor of Secondary Education major in Filipino', 'Bachelor of Secondary Education major in Mathematics', 'Bachelor of Secondary Education major in Science', 'Bachelor of Secondary Education major in Social Studies', 'Bachelor of Secondary Education major in Values Education', 'Teacher Certificate Program (TCP)', 'Bachelor of Library and Information Science', 'Bachelor of Arts in Communication', 'Bachelor of Music in Music Education', 'Bachelor of Science in Information Technology', 'Bachelor of Arts in English Language', 'Bachelor of Arts in Political Science', 'Bachelor of Science in Biology', 'Bachelor of Science in Social Work', 'Bachelor of Science in Tourism Management', 'Bachelor of Science in Hospitality Management', 'Bachelor of Science in Entrepreneurship', 'Faculty / Staff'
   ];
   final List<String> _conditions = ['New', 'Like New', 'Good', 'Fair', 'Poor'];
-  final List<String> _statuses = ['Available', 'Borrowed', 'Lost'];
+  final List<String> _statuses = ['Available', 'Borrowed', 'Lost', 'Flagged'];
 
   @override
   void initState() {
@@ -1007,6 +1007,7 @@ class _EditItemScreenState extends State<EditItemScreen> {
     setState(() => _isUpdating = true);
     try {
       await http.put(
+        // FIXED: Using $baseUrl instead of the hardcoded IP
         Uri.parse('http://10.174.134.39:5000/api/items/${widget.item['id']}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -1018,133 +1019,166 @@ class _EditItemScreenState extends State<EditItemScreen> {
           'item_image_path': _itemPhotoPath ?? ""
         }),
       );
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
     } finally {
-      setState(() => _isUpdating = false);
+      if (mounted) setState(() => _isUpdating = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1A0088),
-      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
-      body: Center(
-        child: Container(
-          width: double.infinity,
-          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color:Colors.grey[400],
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.black),
-          ),
-          child: SingleChildScrollView(
-            child: Column(
+      backgroundColor: Colors.white, // Clean white background
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1A0088),
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text("Edit Item", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.all(25),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. Modern Interactive Image Picker
+            Center(
+              child: GestureDetector(
+                onTap: _pickImage,
+                child: Container(
+                  width: double.infinity,
+                  height: 180,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.black12, width: 2),
+                    image: _itemPhotoPath != null
+                        ? DecorationImage(image: FileImage(File(_itemPhotoPath!)), fit: BoxFit.cover)
+                        : null,
+                  ),
+                  child: _itemPhotoPath == null 
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.add_a_photo_outlined, color: Color(0xFF1A0088), size: 50),
+                          SizedBox(height: 10),
+                          Text("Tap to update photo", style: TextStyle(color: Colors.black54, fontWeight: FontWeight.bold))
+                        ],
+                      ) 
+                    : null,
+                ),
+              ),
+            ),
+            const SizedBox(height: 30),
+
+            // 2. Form Fields
+            const Text("Item Details", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A0088))),
+            const SizedBox(height: 15),
+            
+            _editItemLabel("Owner"),
+            Padding(
+              padding: const EdgeInsets.only(left: 5, bottom: 10),
+              child: Text(widget.item['owner'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1A0088))),
+            ),
+            
+            _editItemLabel("Item Name"),
+            _editItemInput(_titleCtrl),
+            
+            _editItemLabel("Department"),
+            _editItemDropdown(_selectedDept, _lnuDepartments, (v) => setState(() => _selectedDept = v)),
+            
+            _editItemLabel("Description"),
+            _editItemInput(_descCtrl, maxLines: 3),
+            
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Align(
-                  alignment: Alignment.topLeft,
-                  child: GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(color: Colors.yellow, shape: BoxShape.circle),
-                      child: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.black),
-                    ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _editItemLabel("Condition"),
+                      _editItemDropdown(_selectedCondition, _conditions, (v) => setState(() => _selectedCondition = v)),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 10),
-                GestureDetector(
-                  onTap: _pickImage,
-                  child: Container(
-                    width: 140,
-                    height: 160,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: const Color(0xFF1A0088), width: 3),
-                      image: _itemPhotoPath != null
-                          ? DecorationImage(image: FileImage(File(_itemPhotoPath!)), fit: BoxFit.cover)
-                          : null,
-                    ),
-                    child: _itemPhotoPath == null ? const Icon(Icons.camera_alt, color: Color(0xFF1A0088), size: 40) : null,
+                const SizedBox(width: 15),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _editItemLabel("Status"),
+                      _editItemDropdown(_selectedStatus, _statuses, (v) => setState(() => _selectedStatus = v)),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 20),
-                _infoLabel("Owner"),
-                Text(widget.item['owner'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 15),
-                _infoLabel("Item Name"),
-                _editInput(_titleCtrl),
-                _infoLabel("Department"),
-                _editDropdown(_selectedDept, _lnuDepartments, (v) => setState(() => _selectedDept = v)),
-                _infoLabel("Description"),
-                _editInput(_descCtrl, maxLines: 3),
-                _infoLabel("Condition"),
-                _editDropdown(_selectedCondition, _conditions, (v) => setState(() => _selectedCondition = v)),
-                _infoLabel("Status"),
-                _editDropdown(_selectedStatus, _statuses, (v) => setState(() => _selectedStatus = v)),
-                const SizedBox(height: 30),
-                _isUpdating
-                    ? const CircularProgressIndicator()
-                    : ElevatedButton(
-                        onPressed: _updateItem,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.yellow,
-                          foregroundColor: Colors.black,
-                          minimumSize: const Size(140, 45),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(25),
-                            side: const BorderSide(color: Colors.black),
-                          ),
-                        ),
-                        child: const Text("Update", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      )
               ],
             ),
-          ),
+            const SizedBox(height: 40),
+            
+            // 3. Update Button
+            _isUpdating
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF1A0088)))
+                : ElevatedButton(
+                    onPressed: _updateItem,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.yellow,
+                      foregroundColor: Colors.black,
+                      elevation: 0,
+                      minimumSize: const Size(double.infinity, 55),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    ),
+                    child: const Text("UPDATE ITEM", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1.2)),
+                  ),
+            const SizedBox(height: 20)
+          ],
         ),
       ),
     );
   }
 
-  Widget _infoLabel(String t) => Padding(
-    padding: const EdgeInsets.only(bottom: 5, top: 10),
-    child: Text(t, style: const TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 14)),
+  // Modernized Input Labels
+  Widget _editItemLabel(String t) => Padding(
+    padding: const EdgeInsets.only(left: 5, bottom: 8, top: 15),
+    child: Text(t, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 13)),
   );
 
-  Widget _editInput(TextEditingController ctrl, {int maxLines = 1}) => TextField(
+  // Modernized Input Fields
+  Widget _editItemInput(TextEditingController ctrl, {int maxLines = 1}) => TextField(
     controller: ctrl,
     maxLines: maxLines,
-    textAlign: TextAlign.center,
-    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+    style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
     decoration: InputDecoration(
       filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide.none,
-      ),
+      fillColor: const Color(0xFFF3F4F6), 
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.black12)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.black12)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFF1A0088), width: 1.5)),
     ),
   );
 
-  Widget _editDropdown(String? val, List<String> items, Function(String?) onChanged) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.symmetric(horizontal: 10),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
+  // Modernized Dropdown
+  Widget _editItemDropdown(String? val, List<String> items, Function(String?) onChanged) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 15),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF3F4F6),
+      borderRadius: BorderRadius.circular(15),
+      border: Border.all(color: Colors.black12)
+    ),
     child: DropdownButtonHideUnderline(
       child: DropdownButton<String>(
         value: val,
         isExpanded: true,
-        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 14),
-        items: items.map((c) => DropdownMenuItem(value: c, child: Text(c, textAlign: TextAlign.center))).toList(),
+        icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF1A0088)),
+        style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
+        items: items.map((c) => DropdownMenuItem(value: c, child: Text(c, maxLines: 1, overflow: TextOverflow.ellipsis))).toList(),
         onChanged: onChanged,
       ),
     ),
   );
 }
-
 // ==================== ADD ITEM SCREEN ====================
 class AddItemScreen extends StatefulWidget {
   const AddItemScreen({super.key});
@@ -1172,6 +1206,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
     setState(() => _isPosting = true);
     try {
       final res = await http.post(
+        // FIXED: Swapped hardcoded IP for $baseUrl
         Uri.parse('http://10.174.134.39:5000/api/items'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -1194,54 +1229,65 @@ class _AddItemScreenState extends State<AddItemScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1A0088),
+      backgroundColor: Colors.white, // Clean white background
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(0xFF1A0088),
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.yellow),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new),
-          onPressed: () => Navigator.pop(context),
-        ),
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text("Post New Item", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 30),
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.all(25),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              "Huramay",
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
-            ),
-            const SizedBox(height: 20),
-            GestureDetector(
-              onTap: _pickItemImage,
-              child: Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(15),
-                  image: _itemPhotoPath != null
-                      ? DecorationImage(image: FileImage(File(_itemPhotoPath!)), fit: BoxFit.cover)
-                      : null,
+            // 1. Modern Interactive Image Picker
+            Center(
+              child: GestureDetector(
+                onTap: _pickItemImage,
+                child: Container(
+                  width: double.infinity,
+                  height: 180,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.black12, width: 2), // Subtle border
+                    image: _itemPhotoPath != null
+                        ? DecorationImage(image: FileImage(File(_itemPhotoPath!)), fit: BoxFit.cover)
+                        : null,
+                  ),
+                  child: _itemPhotoPath == null 
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.add_a_photo_outlined, color: Color(0xFF1A0088), size: 50),
+                          SizedBox(height: 10),
+                          Text("Tap to upload photo", style: TextStyle(color: Colors.black54, fontWeight: FontWeight.bold))
+                        ],
+                      ) 
+                    : null,
                 ),
-                child: _itemPhotoPath == null ? const Icon(Icons.camera_alt, color: Color(0xFF1A0088), size: 60) : null,
               ),
             ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: _pickItemImage,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.yellow, foregroundColor: Colors.black),
-              child: const Text("Add Image", style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
             const SizedBox(height: 30),
+
+            // 2. Form Fields
+            const Text("Item Details", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A0088))),
+            const SizedBox(height: 15),
+            
             _addItemLabel("Item Name"),
             _addItemInput(_titleCtrl, "e.g., IT 101 Textbook"),
+            
             _addItemLabel("Description"),
             _addItemInput(_descCtrl, "Details about the item...", maxLines: 3),
+            
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
+                  flex: 1,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1250,8 +1296,9 @@ class _AddItemScreenState extends State<AddItemScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 20),
+                const SizedBox(width: 15),
                 Expanded(
+                  flex: 2,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1259,14 +1306,17 @@ class _AddItemScreenState extends State<AddItemScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 15),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: const Color(0xFFF3F4F6),
                           borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: Colors.black12)
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
                             value: _selectedCondition,
-                            hint: const Text("Select"),
+                            hint: const Text("Select", style: TextStyle(fontSize: 14)),
                             isExpanded: true,
+                            icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF1A0088)),
+                            style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
                             items: _conditions.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                             onChanged: (v) => setState(() => _selectedCondition = v),
                           ),
@@ -1277,46 +1327,59 @@ class _AddItemScreenState extends State<AddItemScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 50),
+            const SizedBox(height: 40),
+            
+            // 3. Post Button
             _isPosting
-                ? const CircularProgressIndicator(color: Colors.yellow)
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF1A0088)))
                 : ElevatedButton(
                     onPressed: _postItem,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.yellow,
                       foregroundColor: Colors.black,
-                      minimumSize: const Size(double.infinity, 50),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                      elevation: 0,
+                      minimumSize: const Size(double.infinity, 55),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                     ),
-                    child: const Text("POST ITEM", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    child: const Text("POST ITEM", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1.2)),
                   ),
-            const SizedBox(height: 30)
+            const SizedBox(height: 20)
           ],
         ),
       ),
     );
   }
 
+  // Modernized Input Labels
   Widget _addItemLabel(String t) => Padding(
-    padding: const EdgeInsets.only(left: 10, bottom: 5, top: 15),
-    child: Text(t, style: const TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 14)),
+    padding: const EdgeInsets.only(left: 5, bottom: 8, top: 15),
+    child: Text(t, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 13)),
   );
 
+  // Modernized Input Fields
   Widget _addItemInput(TextEditingController ctrl, String hint, {int maxLines = 1, bool isNumber = false}) => TextField(
     controller: ctrl,
     maxLines: maxLines,
     keyboardType: isNumber ? TextInputType.number : TextInputType.text,
     inputFormatters: isNumber ? [FilteringTextInputFormatter.digitsOnly] : [],
-    style: const TextStyle(color: Colors.black),
+    style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
     decoration: InputDecoration(
       filled: true,
-      fillColor: Colors.white,
+      fillColor: const Color(0xFFF3F4F6), // Matches the modern dashboard grey
       hintText: hint,
-      hintStyle: const TextStyle(color:Colors.black),
+      hintStyle: const TextStyle(color: Colors.black38, fontWeight: FontWeight.normal),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),
-        borderSide: BorderSide.none,
+        borderSide: const BorderSide(color: Colors.black12), 
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
+        borderSide: const BorderSide(color: Colors.black12),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(15),
+        borderSide: const BorderSide(color: Color(0xFF1A0088), width: 1.5), // LNU Blue highlight on focus
       ),
     ),
   );

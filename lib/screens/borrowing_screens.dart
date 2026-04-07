@@ -173,7 +173,6 @@ class _RequestCardState extends State<_RequestCard> {
     );
   }
 
-  // NEW: A confirmation pop-up so lenders don't accidentally click "Returned" early
   void _confirmReturn() {
     showDialog(
       context: context,
@@ -215,69 +214,108 @@ class _RequestCardState extends State<_RequestCard> {
     String? imgPath = item['image'];
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
 
+    // Dynamic color system for the Status Pill
+    Color statusColor;
+    Color statusBgColor;
+    
+    if (currentStatus.toLowerCase() == 'returned') {
+      statusColor = Colors.green;
+      statusBgColor = Colors.green.shade50;
+    } else if (currentStatus.toLowerCase() == 'pending') {
+      statusColor = Colors.orange;
+      statusBgColor = Colors.orange.shade50;
+    } else if (currentStatus.toLowerCase() == 'declined') {
+      statusColor = Colors.red;
+      statusBgColor = Colors.red.shade50;
+    } else if (currentStatus.toLowerCase() == 'accepted') {
+      statusColor = Colors.blue;
+      statusBgColor = Colors.blue.shade50;
+    } else {
+      statusColor = const Color(0xFF1A0088);
+      statusBgColor = Colors.blue.shade50;
+    }
+
     return GestureDetector(
       onTap: _showDetailOverlay,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6), // Modern Dashboard Grey
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: Colors.black12, width: 1),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 5, offset: const Offset(0, 3))]
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Left: Clean White Image Box
             Container(
-              width: 120,
-              height: 140,
+              width: 85,
+              height: 85,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: const Color(0xFF1A0088), width: 2), 
-                image: hasImage 
-                  ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) 
-                  : null,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: statusColor, width: 1.5), // Colored border matches the status
+                image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
               ),
-              child: !hasImage ? const Icon(Icons.image, size: 40, color: Colors.grey) : null,
+              child: !hasImage ? const Icon(Icons.image, size: 30, color: Colors.grey) : null,
             ),
             const SizedBox(width: 15),
+            
+            // Right: Details and Actions
             Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6), 
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: Colors.black12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    )
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.requestData['full_name'],
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A0088), fontSize: 13),
-                    ),
-                    Text(
-                      widget.requestData['department'],
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
-                    ),
-                    Text(
-                      "${widget.requestData['start_date']} - ${widget.requestData['end_date']}",
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      currentStatus,
-                      style: TextStyle(
-                        color: currentStatus == 'Pending' ? Colors.orange : (currentStatus == 'Accepted' ? Colors.green : (currentStatus == 'Returned' ? Colors.blue : Colors.red)), 
-                        fontWeight: FontWeight.bold, 
-                        fontSize: 13
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Row 1: Name & Status Pill
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.requestData['full_name'] ?? "Unknown",
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A0088), fontSize: 13),
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 15),
+                      const SizedBox(width: 5),
+                      // Modern Dynamic Status Pill
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: statusBgColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: statusColor, width: 1),
+                        ),
+                        child: Text(
+                          currentStatus,
+                          style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 10),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  
+                  // Row 2: Department
+                  Text(
+                    widget.requestData['department'] ?? "No Department",
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87),
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  
+                  // Row 3: Dates
+                  Text(
+                    "${widget.requestData['start_date']} - ${widget.requestData['end_date']}",
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black54),
+                  ),
+
+                  // Row 4: Buttons docked at the bottom
+                  if (currentStatus == 'Pending' || currentStatus == 'Accepted') ...[
+                    const SizedBox(height: 12),
                     
-                    // Action buttons based on status
                     if (currentStatus == 'Pending') 
                       Row(
                         children: [
@@ -289,9 +327,10 @@ class _RequestCardState extends State<_RequestCard> {
                                 foregroundColor: Colors.white,
                                 elevation: 0,
                                 padding: EdgeInsets.zero,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                minimumSize: const Size(0, 30),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                               ),
-                              child: const Text("Accept", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              child: const Text("Accept", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -300,18 +339,17 @@ class _RequestCardState extends State<_RequestCard> {
                               onPressed: () => _updateStatus('Declined'),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: Colors.red,
-                                side: const BorderSide(color: Colors.red, width: 1.5), 
+                                side: const BorderSide(color: Colors.red, width: 1), 
                                 padding: EdgeInsets.zero,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                minimumSize: const Size(0, 30),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                               ),
-                              child: const Text("Decline", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              child: const Text("Decline", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                             ),
                           ),
                         ],
-                      ),
-                      
-                    // NEW: Split row for "Message" and "Mark as Returned"
-                    if (currentStatus == 'Accepted')
+                      )
+                    else if (currentStatus == 'Accepted')
                       Row(
                         children: [
                           Expanded(
@@ -336,29 +374,37 @@ class _RequestCardState extends State<_RequestCard> {
                                 foregroundColor: Colors.white,
                                 elevation: 0,
                                 padding: EdgeInsets.zero,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                minimumSize: const Size(0, 30),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                               ),
                             ),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
                             child: ElevatedButton.icon(
-                              onPressed: _confirmReturn, // Calls the confirmation popup
+                              onPressed: _confirmReturn,
                               icon: const Icon(Icons.check_circle_outline, size: 14),
                               label: const Text("Returned", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green, // Visual indicator of success/completion
+                                backgroundColor: Colors.green,
                                 foregroundColor: Colors.white,
                                 elevation: 0,
                                 padding: EdgeInsets.zero,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                minimumSize: const Size(0, 30),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                               ),
                             ),
                           ),
                         ],
                       ),
-                  ],
-                ),
+                  ] else ...[
+                     const SizedBox(height: 12),
+                     const Text(
+                       "Tap to view details", 
+                       style: TextStyle(fontSize: 10, color: Colors.grey, fontStyle: FontStyle.italic)
+                     ),
+                  ]
+                ],
               ),
             ),
           ],

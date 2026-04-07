@@ -135,6 +135,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         ),
                       )
                     : ListView.builder(
+                        physics: const BouncingScrollPhysics(),
                         itemCount: historyItems.length,
                         itemBuilder: (c, i) => _HistoryCard(historyData: historyItems[i]),
                       ),
@@ -145,6 +146,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 }
 
+// =======================================================================
+// UPDATED: Modernized UI Match for the History Card
+// =======================================================================
 class _HistoryCard extends StatelessWidget {
   final dynamic historyData;
   const _HistoryCard({required this.historyData});
@@ -154,7 +158,29 @@ class _HistoryCard extends StatelessWidget {
     dynamic item = historyData['item'] ?? {}; 
     String? imgPath = item['image'];
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
-    bool isReturned = historyData['status']?.toString().toLowerCase() == 'returned';
+    
+    String currentStatus = historyData['status']?.toString() ?? 'Pending';
+    
+    // Dynamic color system for the Status Pill
+    Color statusColor;
+    Color statusBgColor;
+    
+    if (currentStatus.toLowerCase() == 'returned') {
+      statusColor = Colors.green;
+      statusBgColor = Colors.green.shade50;
+    } else if (currentStatus.toLowerCase() == 'pending') {
+      statusColor = Colors.orange;
+      statusBgColor = Colors.orange.shade50;
+    } else if (currentStatus.toLowerCase() == 'declined') {
+      statusColor = Colors.red;
+      statusBgColor = Colors.red.shade50;
+    } else if (currentStatus.toLowerCase() == 'accepted') {
+      statusColor = Colors.blue;
+      statusBgColor = Colors.blue.shade50;
+    } else {
+      statusColor = const Color(0xFF1A0088);
+      statusBgColor = Colors.blue.shade50;
+    }
 
     return GestureDetector(
       onTap: () {
@@ -163,65 +189,93 @@ class _HistoryCard extends StatelessWidget {
           builder: (context) => HistoryDetailOverlay(historyData: historyData),
         );
       },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6), // Modern Dashboard Grey
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: Colors.black12, width: 1),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 5, offset: const Offset(0, 3))]
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Left: Clean White Image Box
             Container(
-              width: 120,
-              height: 140,
+              width: 85,
+              height: 85,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: const Color(0xFF1A0088), width: 2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: statusColor, width: 1.5), // Colored border matches the status!
                 image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
               ),
-              child: !hasImage ? const Icon(Icons.image, size: 40, color: Colors.grey) : null,
+              child: !hasImage ? const Icon(Icons.image, size: 30, color: Colors.grey) : null,
             ),
             const SizedBox(width: 15),
+            
+            // Right: Details and Status Pill
             Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6), 
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: Colors.black12),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item['owner'] ?? "Unknown Owner",
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A0088), fontSize: 13),
-                    ),
-                    Text(
-                      item['title'] ?? "Untitled Item",
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
-                    ),
-                    Text(
-                      item['dept'] ?? "No Department",
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      historyData['status'] ?? "No Status",
-                      style: TextStyle(
-                        color: isReturned ? Colors.green : const Color(0xFF1A0088), 
-                        fontWeight: FontWeight.bold, 
-                        fontSize: 13
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Row 1: Name & Status Pill
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item['owner'] ?? "Unknown Owner",
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A0088), fontSize: 13),
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 5),
-                    const Text(
-                      "Tap to view details & reviews", 
-                      style: TextStyle(fontSize: 10, color: Colors.grey, fontStyle: FontStyle.italic)
-                    ),
-                  ],
-                ),
+                      const SizedBox(width: 5),
+                      // Modern Dynamic Status Pill
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: statusBgColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: statusColor, width: 1),
+                        ),
+                        child: Text(
+                          currentStatus,
+                          style: TextStyle(
+                            color: statusColor, 
+                            fontWeight: FontWeight.bold, 
+                            fontSize: 10
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  
+                  // Row 2: Title
+                  Text(
+                    item['title'] ?? "Untitled Item",
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  
+                  // Row 3: Department
+                  Text(
+                    item['dept'] ?? "No Department",
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87),
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  // Row 4: Helper Text docked at bottom
+                  const Text(
+                    "Tap to view details & reviews", 
+                    style: TextStyle(fontSize: 10, color: Colors.grey, fontStyle: FontStyle.italic)
+                  ),
+                ],
               ),
             ),
           ],

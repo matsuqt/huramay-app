@@ -93,6 +93,7 @@ class _AppSidebarState extends State<AppSidebar> {
                 _modernMenuBtn(context, "My Items", Icons.inventory_2_outlined),
                 _modernMenuBtn(context, "Department Filters", Icons.filter_list),
                 _modernMenuBtn(context, "Favorites", Icons.favorite_border),
+
                 
                 // Messages with a modern badge
                 _modernMenuBtn(
@@ -111,8 +112,7 @@ class _AppSidebarState extends State<AppSidebar> {
                 
                 _modernMenuBtn(context, "History", Icons.history),
                 _modernMenuBtn(context, "Requests", Icons.notifications_none),
-                
-                // FIXED: Moved the Reports button here so EVERYONE can see it!
+
                 _modernMenuBtn(context, "Reports", Icons.report_gmailerrorred),
                 
                 // Admin Section (Only Admins see the Admin Panel)

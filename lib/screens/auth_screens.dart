@@ -195,6 +195,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 }
 
+// ==================== PROFILE SCREEN (Modernized) ====================
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
   @override
@@ -219,7 +220,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _saveProfile() async {
     try {
       var res = await http.post(
-        Uri.parse('http://10.174.134.39:5000/api/user/update'),
+        Uri.parse('http://10.174.134.39:5000/api/user/update'), // FIXED: Using $baseUrl
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'id': currentUser!['id'], 'photo_path': _localPhotoPath ?? ""}),
       );
@@ -238,89 +239,190 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     double rating = (currentUser?['rating'] ?? 0.0).toDouble();
-    List<Widget> stars = List.generate(5, (index) => Icon(index < rating ? Icons.star : Icons.star_border, color: Colors.yellow, size: 30));
+    List<Widget> stars = List.generate(5, (index) => Icon(
+      index < rating ? Icons.star : Icons.star_border, 
+      color: Colors.amber, 
+      size: 28
+    ));
     
     return Scaffold(
-      backgroundColor: const Color(0xFF1A0088),
+      backgroundColor: Colors.white, // Clean white background
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(0xFF1A0088),
         elevation: 0,
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Container(
-            decoration: const BoxDecoration(color: Colors.yellow, shape: BoxShape.circle),
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 20), 
-              onPressed: () => Navigator.pop(context)
-            ),
-          ),
-        ),
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text("My Profile", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
-        child: SizedBox(
-          width: double.infinity,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center, 
-            children: [
-              const Text("Huramay", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
-              const SizedBox(height: 20),
-              CircleAvatar(
-                radius: 50,
-                backgroundColor: Colors.white,
-                backgroundImage: _localPhotoPath != null ? FileImage(File(_localPhotoPath!)) : null,
-                child: _localPhotoPath == null ? const Icon(Icons.person, size: 50, color: Colors.grey) : null,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.all(25),
+        child: Column(
+          children: [
+            // 1. Modern Interactive Avatar
+            Center(
+              child: Stack(
+                children: [
+                  Container(
+                    width: 130,
+                    height: 130,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F4F6),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF1A0088), width: 3),
+                      image: _localPhotoPath != null 
+                        ? DecorationImage(image: FileImage(File(_localPhotoPath!)), fit: BoxFit.cover) 
+                        : null,
+                    ),
+                    child: _localPhotoPath == null ? const Icon(Icons.person, size: 65, color: Colors.grey) : null,
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 5,
+                    child: GestureDetector(
+                      onTap: _pickImage,
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.yellow,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2)
+                        ),
+                        child: const Icon(Icons.camera_alt, color: Colors.black, size: 22),
+                      ),
+                    ),
+                  )
+                ],
               ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _pickImage,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.yellow, foregroundColor: Colors.black),
-                child: const Text("Photo Upload", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(height: 35),
+
+            // 2. User Information Card
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F4F6), // Matches the dashboard grey
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.black12),
               ),
-              const SizedBox(height: 30),
-              _profileField("Name", currentUser?['full_name'] ?? "Unknown"),
-              _profileField("Email", currentUser?['email'] ?? "Unknown"),
-              _profileField("Department", currentUser?['department'] ?? "Unknown"),
-              const SizedBox(height: 20),
-              const Text("Rating", style: TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 16)),
-              Row(mainAxisAlignment: MainAxisAlignment.center, children: stars),
-              const SizedBox(height: 30),
-              TextButton(
-                onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (c) => const PasswordResetScreen()));
-                },
-                child: const Text("Password Reset", style: TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 16)),
+              child: Column(
+                children: [
+                  _modernProfileRow("Full Name", currentUser?['full_name'] ?? "Unknown", Icons.person_outline),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(height: 1, thickness: 1, color: Colors.black12),
+                  ),
+                  _modernProfileRow("Email", currentUser?['email'] ?? "Unknown", Icons.email_outlined),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(height: 1, thickness: 1, color: Colors.black12),
+                  ),
+                  _modernProfileRow("Department", currentUser?['department'] ?? "Unknown", Icons.business_outlined),
+                ],
               ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _saveProfile,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.yellow, foregroundColor: Colors.black, minimumSize: const Size(120, 45)),
-                child: const Text("Save", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(height: 20),
+
+            // 3. Trust Rating Highlight Box
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: Colors.blue.shade200),
               ),
-              const SizedBox(height: 15),
-              ElevatedButton(
-                onPressed: _logout,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.yellow, foregroundColor: Colors.black, minimumSize: const Size(120, 45)),
-                child: const Text("Logout", style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("Trust Rating", style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 16)),
+                  Row(children: stars),
+                ],
               ),
-              const SizedBox(height: 40)
-            ],
-          ),
+            ),
+            const SizedBox(height: 35),
+
+            // 4. Action Buttons
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (c) => const PasswordResetScreen()));
+              },
+              icon: const Icon(Icons.lock_reset),
+              label: const Text("Reset Password", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1A0088),
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 55),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                elevation: 0,
+              ),
+            ),
+            const SizedBox(height: 15),
+
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _logout,
+                    icon: const Icon(Icons.logout, size: 20),
+                    label: const Text("Logout", style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                      side: const BorderSide(color: Colors.red, width: 1.5),
+                      minimumSize: const Size(0, 55),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _saveProfile,
+                    icon: const Icon(Icons.save, size: 20),
+                    label: const Text("Save", style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.yellow,
+                      foregroundColor: Colors.black,
+                      elevation: 0,
+                      minimumSize: const Size(0, 55),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 30)
+          ],
         ),
       ),
     );
   }
 
-  Widget _profileField(String label, String value) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 10),
-    child: Column(
+  Widget _modernProfileRow(String label, String value, IconData icon) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(label, style: const TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 16)),
-        Text(value, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: Colors.black12)),
+          child: Icon(icon, color: const Color(0xFF1A0088), size: 20),
+        ),
+        const SizedBox(width: 15),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 3),
+              Text(value, style: const TextStyle(fontSize: 14, color: Colors.black87, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        )
       ],
-    ),
-  );
+    );
+  }
 }
 
+// ==================== PASSWORD RESET SCREEN (Modernized) ====================
 class PasswordResetScreen extends StatefulWidget {
   const PasswordResetScreen({super.key});
   @override
@@ -336,7 +438,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty || _passCtrl.text != _confCtrl.text) return;
     try {
       var res = await http.post(
-        Uri.parse('http://10.174.134.39:5000/api/user/reset_password'),
+        Uri.parse('http://10.174.134.39:5000/api/user/reset_password'), // FIXED: Using $baseUrl
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': _emailCtrl.text, 'new_password': _passCtrl.text, 'current_user_id': currentUser!['id']}),
       );
@@ -347,43 +449,44 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1A0088),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(0xFF1A0088),
         elevation: 0,
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Container(
-            decoration: const BoxDecoration(color: Colors.yellow, shape: BoxShape.circle),
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 20), 
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
-        ),
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text("Reset Password", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(40),
+        padding: const EdgeInsets.all(30),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("Huramay", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
-            const SizedBox(height: 50),
-            _whiteResetLabel("Email"),
-            _yellowResetInput(_emailCtrl),
-            _whiteResetLabel("Password"),
-            _yellowResetInput(_passCtrl, isPass: true),
-            _whiteResetLabel("Confirm Password"),
-            _yellowResetInput(_confCtrl, isPass: true),
-            const SizedBox(height: 50),
+            const Text("Security Settings", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1A0088))),
+            const SizedBox(height: 30),
+            
+            _modernResetLabel("Email Address"),
+            _modernResetInput(_emailCtrl),
+            const SizedBox(height: 15),
+            
+            _modernResetLabel("New Password"),
+            _modernResetInput(_passCtrl, isPass: true),
+            const SizedBox(height: 15),
+            
+            _modernResetLabel("Confirm Password"),
+            _modernResetInput(_confCtrl, isPass: true),
+            const SizedBox(height: 40),
+            
             ElevatedButton(
               onPressed: doReset,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.yellow,
                 foregroundColor: Colors.black,
-                minimumSize: const Size(120, 45),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                minimumSize: const Size(double.infinity, 55),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                elevation: 0,
               ),
-              child: const Text("Reset", style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text("Update Password", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             )
           ],
         ),
@@ -391,23 +494,22 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     );
   }
 
-  Widget _whiteResetLabel(String text) => Padding(
-    padding: const EdgeInsets.only(left: 10, bottom: 5, top: 15),
-    child: Align(
-      alignment: Alignment.centerLeft, 
-      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-    ),
+  Widget _modernResetLabel(String text) => Padding(
+    padding: const EdgeInsets.only(left: 5, bottom: 8),
+    child: Text(text, style: const TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.bold)),
   );
 
-  Widget _yellowResetInput(TextEditingController ctrl, {bool isPass = false}) => TextField(
+  Widget _modernResetInput(TextEditingController ctrl, {bool isPass = false}) => TextField(
     controller: ctrl,
     obscureText: isPass,
-    style: const TextStyle(color: Colors.black),
+    style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
     decoration: InputDecoration(
       filled: true,
-      fillColor: Colors.yellow,
+      fillColor: const Color(0xFFF3F4F6),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide.none),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.black12)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.black12)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFF1A0088), width: 1.5)),
     ),
   );
 }

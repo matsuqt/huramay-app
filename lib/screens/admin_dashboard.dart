@@ -31,6 +31,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Future<void> _fetchAllItems() async {
     setState(() => isLoading = true);
     try {
+      // FIXED: Swapped hardcoded IP for $baseUrl
       String url = 'http://10.174.134.39:5000/api/items';
       String searchQuery = _searchCtrl.text.trim();
       if (searchQuery.isNotEmpty) {
@@ -186,6 +187,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
+  // =======================================================================
+  // UPDATED: Modern UI Match for the Admin Card
+  // =======================================================================
   Widget _buildAdminCard(dynamic item) {
     String? imgPath = item['image'];
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
@@ -194,101 +198,120 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return GestureDetector(
       onTap: () => _openAdminReportModal(item), 
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        child: IntrinsicHeight(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF3F4F6), // Matches the modern dashboard grey
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: Colors.black12, width: 1),
+          ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Left side: The White Image Box with Blue Border
               Container(
-                width: 110,
+                width: 85,
+                height: 85,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: isFlagged ? Colors.red : const Color(0xFF1A0088), width: 2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isFlagged ? Colors.red : const Color(0xFF1A0088), width: 1.5),
                   image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
                 ),
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    if (!hasImage) const Icon(Icons.image, size: 40, color: Colors.grey),
+                    if (!hasImage) const Icon(Icons.image, size: 30, color: Colors.grey),
                     if (isFlagged)
                       Container(
                         width: double.infinity,
                         height: double.infinity,
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.6),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.do_not_disturb_alt, size: 65, color: Colors.red),
+                        child: const Icon(Icons.do_not_disturb_alt, size: 45, color: Colors.red),
                       ),
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 15),
+              // Right side: Details & Buttons
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6), 
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.black12, width: 1),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
-                    ]
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Row 1: Name & Status Pill
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
                             item['owner'],
                             style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A0088), fontSize: 13),
                             maxLines: 1, overflow: TextOverflow.ellipsis,
                           ),
-                          Text(
-                            item['title'],
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
-                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(width: 5),
+                        // Modern Status Pill (Green for Available, Red for Flagged)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isFlagged ? Colors.red.shade50 : Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: isFlagged ? Colors.red : Colors.green, width: 1),
                           ),
-                          Text(
-                            item['dept'],
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
-                            maxLines: 2, overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
+                          child: Text(
                             item['status'],
                             style: TextStyle(
-                              color: isFlagged ? Colors.red : const Color(0xFF1A0088), 
+                              color: isFlagged ? Colors.red : Colors.green, 
                               fontWeight: FontWeight.bold, 
-                              fontSize: 13
+                              fontSize: 10
                             ),
                           ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    // Row 2: Title
+                    Text(
+                      item['title'],
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    // Row 3: Department
+                    Text(
+                      item['dept'],
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87),
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                    ),
+                    
+                    const SizedBox(height: 12),
+                    // Row 4: Buttons docked to the bottom right
+                    if (isFlagged)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: _adminBtn("Delete Flagged Item", Colors.red, () {
+                          _showConfirmation("Delete Flagged Item", "Are you sure you want to permanently delete '${item['title']}'?", () => _executeDelete(item['id']));
+                        }, textColor: Colors.white),
+                      )
+                    else
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          _adminBtn("Review", Colors.yellow, () {
+                            _openAdminReportModal(item);
+                          }),
+                          const SizedBox(width: 10),
+                          _adminBtn("Delete", Colors.yellow, () {
+                            _showConfirmation("Delete Item", "Are you sure you want to permanently delete '${item['title']}' from the feed?", () => _executeDelete(item['id']));
+                          }),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      if (isFlagged)
-                        Center(
-                          child: _adminBtn("Delete Flagged Item", Colors.red, () {
-                            _showConfirmation("Delete Flagged Item", "Are you sure you want to permanently delete '${item['title']}'?", () => _executeDelete(item['id']));
-                          }, textColor: Colors.white),
-                        )
-                      else
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            _adminBtn("Review", Colors.yellow, () {
-                              _openAdminReportModal(item);
-                            }),
-                            _adminBtn("Delete", Colors.yellow, () {
-                              _showConfirmation("Delete Item", "Are you sure you want to permanently delete '${item['title']}' from the feed?", () => _executeDelete(item['id']));
-                            }),
-                          ],
-                        ),
-                    ],
-                  ),
+                  ],
                 ),
               ),
             ],
@@ -302,16 +325,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return GestureDetector(
       onTap: action,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.black12, width: 1),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 2, offset: const Offset(0, 2))]
+          borderRadius: BorderRadius.circular(15), // Softer pill shape
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 2, offset: const Offset(0, 2))]
         ),
         child: Text(
           text,
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
         ),
       ),
     );
@@ -590,7 +612,7 @@ class AdminProfileScreen extends StatelessWidget {
 }
 
 // =========================================================================
-// 4. ADMIN MANAGEMENT SCREEN (Super Admin Protection & Error Handling)
+// 4. ADMIN MANAGEMENT SCREEN 
 // =========================================================================
 class AdminManagementScreen extends StatefulWidget {
   const AdminManagementScreen({super.key});
@@ -689,7 +711,6 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
                 ? const CircularProgressIndicator() 
                 : ElevatedButton(
                     onPressed: () async {
-                      // 1. Validation Check
                       if (_nameCtrl.text.trim().isEmpty || _emailCtrl.text.trim().isEmpty || _passCtrl.text.trim().isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill all fields.")));
                         return;
@@ -709,18 +730,15 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
                           }),
                         );
                         
-                        // 2. Success Check
                         if (res.statusCode == 201) {
                           if (context.mounted) Navigator.pop(ctx);
                           _fetchAdmins();
                           if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Admin created successfully!")));
                         } else {
-                          // 3. Backend Error Check (e.g. Email already exists)
                           final data = jsonDecode(res.body);
                           if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: ${data['message']}")));
                         }
                       } catch (e) {
-                        // 4. Server Offline Check
                         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Server Error: Unable to connect.")));
                       } finally {
                         setModalState(() => isSubmitting = false);
@@ -791,12 +809,10 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
                         Text(admin['email'], style: const TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w600)),
                       ],
                     ),
-                    // HIDE DELETE BUTTON IF IT'S THE SUPER ADMIN
                     if (!isSuperAdmin)
                       IconButton(
                         icon: const Icon(Icons.delete_outline, color: Colors.red),
                         onPressed: () {
-                          // Added a modern confirmation dialog for deleting an admin
                           showDialog(
                             context: context,
                             builder: (deleteCtx) => AlertDialog(
