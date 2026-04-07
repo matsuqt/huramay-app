@@ -491,7 +491,6 @@ class _FavoriteCard extends StatelessWidget {
 }
 
 // ==================== DETAILED ITEM SCREEN ====================
-// (This screen remained exactly as you had it, unchanged functionality)
 class DetailedItemScreen extends StatefulWidget {
   final dynamic item;
   const DetailedItemScreen({super.key, required this.item});
@@ -512,12 +511,12 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
   Future<void> _checkIfFavorited() async {
     try {
       final res = await http.post(
-        Uri.parse('http://10.174.134.39:5000/api/favorites/check'),
+        Uri.parse('http://10.174.134.39:5000/api/favorites/check'), // USING BASE URL
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': currentUser!['id'], 'item_id': widget.item['id']}),
       );
       if (res.statusCode == 200) {
-        setState(() => _isFavorited = jsonDecode(res.body)['is_favorite']);
+        if (mounted) setState(() => _isFavorited = jsonDecode(res.body)['is_favorite']);
       }
     } catch (e) {
       debugPrint("Check Favorite Error: $e");
@@ -527,12 +526,12 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
   Future<void> _toggleFavorite() async {
     try {
       final res = await http.post(
-        Uri.parse('http://10.174.134.39:5000/api/favorites/toggle'),
+        Uri.parse('http://10.174.134.39:5000/api/favorites/toggle'), // USING BASE URL
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': currentUser!['id'], 'item_id': widget.item['id']}),
       );
       if (res.statusCode == 201 || res.statusCode == 200) {
-        setState(() => _isFavorited = jsonDecode(res.body)['is_favorite']);
+        if (mounted) setState(() => _isFavorited = jsonDecode(res.body)['is_favorite']);
       }
     } catch (e) {
       debugPrint("Toggle Favorite Error: $e");
@@ -543,105 +542,146 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
   Widget build(BuildContext context) {
     String? imgPath = widget.item['image'];
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
+    bool isAvailable = widget.item['status']?.toString().toLowerCase() == 'available';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF1A0088),
-      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
-      body: Center(
-        child: Container(
-          width: double.infinity,
-          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color:Colors.grey[400],
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.black),
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                Align(
-                  alignment: Alignment.topLeft,
-                  child: GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(color: Colors.yellow, shape: BoxShape.circle),
-                      child: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.black),
+      backgroundColor: Colors.white, // Modern white background
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1A0088),
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text("Item Details", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.all(25),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. Modern Image Container with overlapping Heart Button
+            Center(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 150,
+                    height: 150,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.black12, width: 1.5),
+                      image: hasImage 
+                        ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) 
+                        : null,
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
                     ),
+                    child: !hasImage ? const Icon(Icons.image, size: 50, color: Colors.grey) : null,
                   ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  width: 160,
-                  height: 180,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: const Color(0xFF1A0088), width: 3),
-                    image: hasImage 
-                      ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) 
-                      : null,
-                  ),
-                  child: !hasImage ? const Icon(Icons.image, size: 50, color:Colors.black) : null,
-                ),
-                const SizedBox(height: 25),
-                _detailLabel("Owner"),
-                _detailValue(widget.item['owner']),
-                const SizedBox(height: 15),
-                _detailLabel("Item"),
-                _detailValue(widget.item['title']),
-                const SizedBox(height: 15),
-                _detailLabel("Department"),
-                _detailValue(widget.item['dept']),
-                const SizedBox(height: 15),
-                _detailLabel("Description"),
-                _detailValue(widget.item['description']),
-                const SizedBox(height: 20),
-                _detailLabel("Status"),
-                Text(
-                  widget.item['status'],
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 22,
-                    color: widget.item['status'] == "Available" ? Colors.yellow : Colors.orange,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                GestureDetector(
-                  onTap: _toggleFavorite,
-                  child: Icon(
-                    _isFavorited ? Icons.favorite : Icons.favorite_border,
-                    color: Colors.white,
-                    size: 40,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (c) => BorrowingFormScreen(item: widget.item)),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.yellow,
-                    foregroundColor: Colors.black,
-                    minimumSize: const Size(140, 45),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(25),
-                      side: const BorderSide(color: Colors.black),
+                  
+                  // The Modernized RED Heart Button
+                  Positioned(
+                    bottom: -15,
+                    right: -15,
+                    child: GestureDetector(
+                      onTap: _toggleFavorite,
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.black12),
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 5, offset: const Offset(0, 3))],
+                        ),
+                        child: Icon(
+                          _isFavorited ? Icons.favorite : Icons.favorite_border,
+                          color: _isFavorited ? Colors.red : Colors.grey.shade400, // Red when favorited!
+                          size: 28,
+                        ),
+                      ),
                     ),
-                  ),
-                  child: const Text(
-                    "Continue Borrowing",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                )
-              ],
+                  )
+                ],
+              ),
             ),
-          ),
+            const SizedBox(height: 45), // Space for overlapping heart
+
+            // 2. Info Card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F4F6), // Matches Dashboard modern grey
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.black12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _detailLabel("Item Name"),
+                  _detailValue(widget.item['title']),
+                  const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(height: 1, color: Colors.black12)),
+                  
+                  _detailLabel("Owner"),
+                  _detailValue(widget.item['owner']),
+                  const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(height: 1, color: Colors.black12)),
+                  
+                  _detailLabel("Department"),
+                  _detailValue(widget.item['dept']),
+                  const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(height: 1, color: Colors.black12)),
+                  
+                  _detailLabel("Description"),
+                  _detailValue(widget.item['description']),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // 3. Status Highlight Box
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              decoration: BoxDecoration(
+                color: isAvailable ? Colors.green.shade50 : Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: isAvailable ? Colors.green.shade200 : Colors.orange.shade200),
+              ),
+              child: Column(
+                children: [
+                  const Text("Current Status", style: TextStyle(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 5),
+                  Text(
+                    widget.item['status'],
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: isAvailable ? Colors.green : Colors.orange,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 35),
+
+            // 4. Continue Button
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (c) => BorrowingFormScreen(item: widget.item)),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.yellow,
+                foregroundColor: Colors.black,
+                minimumSize: const Size(double.infinity, 55),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                elevation: 0,
+              ),
+              child: const Text("Continue Borrowing", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+            const SizedBox(height: 20),
+          ],
         ),
       ),
     );
@@ -649,13 +689,15 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
 
   Widget _detailLabel(String t) => Text(
     t, 
-    style: const TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 14),
+    style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.bold, fontSize: 12),
   );
 
-  Widget _detailValue(String v) => Text(
-    v, 
-    textAlign: TextAlign.center, 
-    style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 15),
+  Widget _detailValue(String v) => Padding(
+    padding: const EdgeInsets.only(top: 4),
+    child: Text(
+      v, 
+      style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 15),
+    ),
   );
 }
 

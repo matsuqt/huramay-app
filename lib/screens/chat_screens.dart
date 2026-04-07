@@ -2,11 +2,36 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:intl/intl.dart'; // REQUIRED FOR TIME FIX
 
 import '../globals.dart';
 import '../widgets/app_sidebar.dart';
 
-// ==================== NEW: VAVT-49 REAL-TIME CHAT UI & VAVT-50 BADGE ====================
+// Helper function to safely parse UTC and convert to Local Time
+String _formatLocalTime(String? utcTimeString) {
+  if (utcTimeString == null || utcTimeString.isEmpty) return "";
+  try {
+    // 1. Force Flutter to recognize it as UTC by appending 'Z'
+    String cleanString = utcTimeString.trim();
+    if (!cleanString.endsWith('Z')) {
+      cleanString = "${cleanString}Z";
+    }
+    
+    // 2. Parse into DateTime
+    DateTime parsedUtc = DateTime.parse(cleanString);
+    
+    // 3. Convert to Phone's Local Timezone
+    DateTime localTime = parsedUtc.toLocal();
+    
+    // 4. Format beautifully (e.g. 04:59 AM)
+    return DateFormat('hh:mm a').format(localTime);
+  } catch (e) {
+    debugPrint("Time Parse Error: $e");
+    return utcTimeString; // Fallback to raw string if it fails
+  }
+}
+
+// ==================== CHAT INBOX SCREEN ====================
 class ChatInboxScreen extends StatefulWidget {
   const ChatInboxScreen({super.key});
   @override
@@ -26,9 +51,9 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   Future<void> _fetchInbox() async {
     setState(() => isLoading = true);
     try {
-      final res = await http.get(Uri.parse('http://10.174.134.39:5000/api/messages/inbox/${currentUser!['id']}'));
+      final res = await http.get(Uri.parse('$baseUrl/api/messages/inbox/${currentUser!['id']}')); // Updated to baseUrl
       if (res.statusCode == 200) {
-        setState(() { threads = jsonDecode(res.body); });
+        if (mounted) setState(() { threads = jsonDecode(res.body); });
       }
     } finally {
       if (mounted) setState(() => isLoading = false);
@@ -48,8 +73,9 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
           child: const TextField(
             decoration: InputDecoration(
               hintText: "Search Messages", 
-              prefixIcon: Icon(Icons.search), 
+              prefixIcon: Icon(Icons.search, color: Colors.grey), 
               border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(vertical: 10)
             ),
           ),
         ),
@@ -64,10 +90,11 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
           ),
           Expanded(
             child: isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF1A0088)))
                 : threads.isEmpty
-                    ? const Center(child: Text("No messages yet", style: TextStyle(color: Colors.grey, fontSize: 18)))
+                    ? const Center(child: Text("No messages yet", style: TextStyle(color: Colors.grey, fontSize: 18, fontWeight: FontWeight.bold)))
                     : ListView.builder(
+                        physics: const BouncingScrollPhysics(),
                         padding: const EdgeInsets.symmetric(horizontal: 15),
                         itemCount: threads.length,
                         itemBuilder: (c, i) => _buildInboxThread(threads[i]),
@@ -78,7 +105,6 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
     );
   }
 
-  // UPDATED: Added Robust JSON Parsing for the Red Badge
   Widget _buildInboxThread(dynamic threadData) {
     int unread = 0;
     if (threadData['unread_count'] != null) {
@@ -89,7 +115,6 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
       padding: const EdgeInsets.only(bottom: 15),
       child: Row(
         children: [
-          // Avatar
           Container(
             padding: const EdgeInsets.all(2),
             decoration: const BoxDecoration(color: Colors.black87, shape: BoxShape.circle),
@@ -100,7 +125,6 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
             ),
           ),
           const SizedBox(width: 15),
-          // Message Snippet
           Expanded(
             child: GestureDetector(
               onTap: () => Navigator.push(context, MaterialPageRoute(
@@ -110,12 +134,13 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                   otherName: threadData['other_name'],
                   itemName: threadData['item_name'],
                 )
-              )).then((_) => _fetchInbox()), // IMPORTANT: Refreshes the inbox to clear the badge when going back
+              )).then((_) => _fetchInbox()), 
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.grey[300], 
+                  color: const Color(0xFFF3F4F6), 
                   borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.black12)
                 ),
                 child: Row(
                   children: [
@@ -134,8 +159,8 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                             overflow: TextOverflow.ellipsis, 
                             style: TextStyle(
                               fontSize: 13, 
-                              color: unread > 0 ? Colors.black87 : Colors.black54, // Darker if unread
-                              fontWeight: unread > 0 ? FontWeight.bold : FontWeight.normal // Bold if unread
+                              color: unread > 0 ? Colors.black87 : Colors.black54, 
+                              fontWeight: unread > 0 ? FontWeight.bold : FontWeight.normal 
                             ),
                           ),
                         ],
@@ -145,8 +170,9 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
+                        // FIX: Applying the local time formatting
                         Text(
-                          threadData['timestamp'] ?? '', 
+                          _formatLocalTime(threadData['timestamp']), 
                           style: TextStyle(
                             fontSize: 10, 
                             color: unread > 0 ? const Color(0xFF1A0088) : Colors.black54,
@@ -177,6 +203,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   }
 }
 
+// ==================== CHAT ROOM SCREEN ====================
 class ChatRoomScreen extends StatefulWidget {
   final int chatRoomId;
   final int otherId;
@@ -209,26 +236,27 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   Future<void> _loadHistory() async {
     try {
-      final res = await http.get(Uri.parse('http://10.174.134.39:5000/api/messages/history/${widget.chatRoomId}'));
+      final res = await http.get(Uri.parse('$baseUrl/api/messages/history/${widget.chatRoomId}')); // Updated to baseUrl
       if (res.statusCode == 200) {
-        setState(() {
-          messages.clear();
-          messages.addAll(jsonDecode(res.body));
-          isLoading = false;
-        });
-        _scrollToBottom();
-        _markMessagesAsRead(); // Trigger read receipt
+        if (mounted) {
+          setState(() {
+            messages.clear();
+            messages.addAll(jsonDecode(res.body));
+            isLoading = false;
+          });
+          _scrollToBottom();
+          _markMessagesAsRead();
+        }
       }
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
   }
 
-  // NEW: Tells the backend the user has viewed the chat
   Future<void> _markMessagesAsRead() async {
     try {
       await http.post(
-        Uri.parse('http://10.174.134.39:5000/api/messages/read'),
+        Uri.parse('$baseUrl/api/messages/read'), // Updated to baseUrl
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'chat_room_id': widget.chatRoomId,
@@ -244,7 +272,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     _msgCtrl.clear();
     try {
       await http.post(
-        Uri.parse('http://10.174.134.39:5000/api/messages/send'),
+        Uri.parse('$baseUrl/api/messages/send'), // Updated to baseUrl
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'chat_room_id': widget.chatRoomId,
@@ -273,9 +301,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A0088), 
+        elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white), 
         leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new), onPressed: () => Navigator.pop(context)),
-        // UPDATED: App Bar with full name and item subtitle per specs
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -288,48 +316,49 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         children: [
           Expanded(
             child: isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF1A0088)))
                 : ListView.builder(
                     controller: _scrollController,
+                    physics: const BouncingScrollPhysics(),
                     padding: const EdgeInsets.all(20),
                     itemCount: messages.length,
                     itemBuilder: (c, i) {
                       bool isMe = messages[i]['sender_id'] == currentUser!['id'];
                       
-                      // UPDATED: Specific Bubble alignments and colors per specs
                       return Align(
                         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                         child: Container(
                           margin: const EdgeInsets.symmetric(vertical: 5),
-                          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
+                          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75), // Slightly wider
                           child: Column(
                             crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: isMe ? const Color(0xFF1A0088) : Colors.grey[300],
+                                  color: isMe ? const Color(0xFF1A0088) : const Color(0xFFF3F4F6),
                                   borderRadius: BorderRadius.only(
-                                    topLeft: const Radius.circular(15),
-                                    topRight: const Radius.circular(15),
-                                    bottomLeft: Radius.circular(isMe ? 15 : 0),
-                                    bottomRight: Radius.circular(isMe ? 0 : 15),
+                                    topLeft: const Radius.circular(18),
+                                    topRight: const Radius.circular(18),
+                                    bottomLeft: Radius.circular(isMe ? 18 : 0),
+                                    bottomRight: Radius.circular(isMe ? 0 : 18),
                                   ),
+                                  border: Border.all(color: isMe ? Colors.transparent : Colors.black12)
                                 ),
                                 child: Text(
                                   messages[i]['content'], 
                                   style: TextStyle(
-                                    color: isMe ? Colors.white : Colors.black, 
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
+                                    color: isMe ? Colors.white : Colors.black87, 
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 15,
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 3),
-                              // Timestamp
+                              const SizedBox(height: 4),
+                              // FIX: Applying the local time formatting here too!
                               Text(
-                                messages[i]['timestamp'],
-                                style: const TextStyle(fontSize: 10, color: Colors.black54),
+                                _formatLocalTime(messages[i]['timestamp']),
+                                style: const TextStyle(fontSize: 10, color: Colors.black54, fontWeight: FontWeight.bold),
                               )
                             ],
                           ),
@@ -340,32 +369,39 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           ),
           // Input Area
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-            color: Colors.grey[200],
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: Colors.grey.shade300))
+            ),
             child: Row(
               children: [
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: const Color(0xFFF3F4F6),
                       borderRadius: BorderRadius.circular(25),
+                      border: Border.all(color: Colors.black12)
                     ),
                     child: TextField(
                       controller: _msgCtrl, 
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                       decoration: const InputDecoration(
                         hintText: "Type a message...", 
+                        hintStyle: TextStyle(fontWeight: FontWeight.normal),
                         border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 10),
-                Container(
-                  decoration: const BoxDecoration(color: Color(0xFF1A0088), shape: BoxShape.circle),
-                  child: IconButton(
-                    onPressed: _send, 
-                    icon: const Icon(Icons.send, color: Colors.white, size: 20),
+                GestureDetector(
+                  onTap: _send,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: const BoxDecoration(color: Color(0xFF1A0088), shape: BoxShape.circle),
+                    child: const Icon(Icons.send, color: Colors.white, size: 20),
                   ),
                 )
               ],

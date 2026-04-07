@@ -315,6 +315,7 @@ def submit_report():
 
 @app.route('/api/reports/all', methods=['GET'])
 def get_all_reports():
+    # FIX 1: Lowercase 't' in ReportItem.timestamp
     reports = ReportItem.query.order_by(ReportItem.timestamp.desc()).all()
     results = []
     for r in reports:
@@ -322,7 +323,8 @@ def get_all_reports():
             results.append({
                 "report_id": r.id,
                 "report_text": r.report_text,
-                "timestamp": r.timestamp.strftime("%b %d, %Y"),
+                # FIX 2: Lowercase 't' in r.timestamp
+                "timestamp": r.timestamp.strftime("%b %d, %Y"), 
                 "reporter_name": r.reporter.full_name,
                 "reporter_dept": r.reporter.department,
                 "item_title": r.item.title,

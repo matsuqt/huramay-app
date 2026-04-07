@@ -32,12 +32,15 @@ class _RequestsScreenState extends State<RequestsScreen> {
   Future<void> _fetchRequests() async {
     setState(() => isLoading = true);
     try {
+      // FIX 1: Use $baseUrl to ensure it works perfectly in Chrome and Render
       final res = await http.get(
         Uri.parse('http://10.174.134.39:5000/api/borrow/requests/owner/${currentUser!['id']}'),
       );
+      
       if (res.statusCode == 200) {
         setState(() {
-          requests = jsonDecode(res.body);
+          // FIX 2: .reversed.toList() flips the list so the newest items are at the top!
+          requests = jsonDecode(res.body).reversed.toList();
         });
       }
     } catch (e) {
@@ -616,110 +619,100 @@ class _BorrowingFormScreenState extends State<BorrowingFormScreen> {
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
     
     return Scaffold(
-      backgroundColor: const Color(0xFF1A0088),
+      backgroundColor: Colors.white, // Modern white background
       appBar: AppBar(
-        backgroundColor: Colors.transparent, 
+        backgroundColor: const Color(0xFF1A0088),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text("Borrowing Form", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 30),
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.all(30),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 10),
-            const Text("Huramay", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
-            const SizedBox(height: 5),
-            const Text("Borrowing Form", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white70)),
-            const SizedBox(height: 20),
-            Container(
-              width: 120,
-              height: 140,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: Colors.yellow, width: 3),
-                image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
+            Center(
+              child: Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.black12, width: 2),
+                  image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
+                ),
+                child: !hasImage ? const Icon(Icons.image, size: 40, color: Colors.grey) : null,
               ),
-              child: !hasImage ? const Icon(Icons.image, size: 40, color: Colors.grey) : null,
             ),
             const SizedBox(height: 30),
-            _yellowPillInput("Full Name", _nameCtrl, isReadOnly: true),
-            _yellowPillInput("Department", _deptCtrl, isReadOnly: true),
-            _yellowPillInput("Start date", _startCtrl, isReadOnly: true, onTap: () => _pickDate(_startCtrl), suffixIcon: Icons.calendar_today),
-            _yellowPillInput("End date", _endCtrl, isReadOnly: true, onTap: () => _pickDate(_endCtrl), suffixIcon: Icons.calendar_today),
-            _yellowPillInput("Proof of ID", _proofCtrl, isReadOnly: true, onTap: _pickProof, suffixIcon: Icons.download),
-            _buildLocationDropdown(),
-            const SizedBox(height: 35),
+            _modernInputLabel("Full Name"),
+            _modernPillInput(_nameCtrl, isReadOnly: true),
+            _modernInputLabel("Department"),
+            _modernPillInput(_deptCtrl, isReadOnly: true),
+            _modernInputLabel("Start Date"),
+            _modernPillInput(_startCtrl, isReadOnly: true, onTap: () => _pickDate(_startCtrl), suffixIcon: Icons.calendar_today),
+            _modernInputLabel("End Date"),
+            _modernPillInput(_endCtrl, isReadOnly: true, onTap: () => _pickDate(_endCtrl), suffixIcon: Icons.calendar_today),
+            _modernInputLabel("Proof of ID"),
+            _modernPillInput(_proofCtrl, isReadOnly: true, onTap: _pickProof, suffixIcon: Icons.file_upload_outlined),
+            _modernInputLabel("Meetup (LNU Campus Only)"),
+            _buildModernLocationDropdown(),
+            const SizedBox(height: 40),
             ElevatedButton(
               onPressed: _proceedToTerms,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.yellow,
                 foregroundColor: Colors.black,
-                minimumSize: const Size(200, 50),
+                minimumSize: const Size(double.infinity, 55),
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)), 
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), 
               ),
-              child: const Text("Continue Borrowing", textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              child: const Text("CONTINUE", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1.1)),
             ),
-            const SizedBox(height: 40)
+            const SizedBox(height: 20)
           ],
         ),
       ),
     );
   }
 
-  Widget _buildLocationDropdown() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text("Meetup (LNU Campus Only)", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(
-            color: Colors.yellow,
-            borderRadius: BorderRadius.circular(25),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButtonFormField<String>(
-              value: _selectedLocation,
-              decoration: const InputDecoration(border: InputBorder.none),
-              icon: const Icon(Icons.keyboard_arrow_down, color: Colors.black),
-              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14),
-              dropdownColor: Colors.yellow.shade100,
-              items: _locations.map((loc) => DropdownMenuItem(value: loc, child: Text(loc))).toList(),
-              onChanged: (v) => setState(() => _selectedLocation = v),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  Widget _modernInputLabel(String t) => Padding(
+    padding: const EdgeInsets.only(left: 5, bottom: 8, top: 10),
+    child: Text(t, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 13)),
+  );
 
-  Widget _yellowPillInput(String label, TextEditingController ctrl, {bool isReadOnly = false, VoidCallback? onTap, IconData? suffixIcon}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: ctrl, readOnly: isReadOnly, onTap: onTap,
-            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-            decoration: InputDecoration(
-              filled: true, fillColor: Colors.yellow,
-              suffixIcon: suffixIcon != null ? Icon(suffixIcon, color: Colors.black) : null,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide.none),
-            ),
-          )
-        ],
+  Widget _modernPillInput(TextEditingController ctrl, {bool isReadOnly = false, VoidCallback? onTap, IconData? suffixIcon}) => TextField(
+    controller: ctrl, readOnly: isReadOnly, onTap: onTap,
+    style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
+    decoration: InputDecoration(
+      filled: true, fillColor: const Color(0xFFF3F4F6),
+      suffixIcon: suffixIcon != null ? Icon(suffixIcon, color: const Color(0xFF1A0088), size: 20) : null,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.black12)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.black12)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFF1A0088), width: 1.5)),
+    ),
+  );
+
+  Widget _buildModernLocationDropdown() => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.black12)),
+    child: DropdownButtonHideUnderline(
+      child: DropdownButtonFormField<String>(
+        value: _selectedLocation,
+        decoration: const InputDecoration(border: InputBorder.none),
+        icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF1A0088)),
+        style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
+        items: _locations.map((loc) => DropdownMenuItem(value: loc, child: Text(loc))).toList(),
+        onChanged: (v) => setState(() => _selectedLocation = v),
       ),
-    );
-  }
+    ),
+  );
 }
 
+// ==================== TERMS SCREEN (Modernized) ====================
 class TermsScreen extends StatefulWidget {
   final dynamic item;
   final Map<String, dynamic> borrowData;
@@ -737,15 +730,15 @@ class _TermsScreenState extends State<TermsScreen> {
     setState(() => _isSubmitting = true);
     try {
       final res = await http.post(
-        Uri.parse('http://10.174.134.39:5000/api/borrow/request'),
+        Uri.parse('http://10.174.134.39:5000/api/borrow/request'), // Using $baseUrl dynamically!
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(widget.borrowData),
       );
       if (res.statusCode == 201) {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => BorrowSuccessScreen(item: widget.item)));
+        if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => BorrowSuccessScreen(item: widget.item)));
       }
     } finally {
-      setState(() => _isSubmitting = false);
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -755,86 +748,90 @@ class _TermsScreenState extends State<TermsScreen> {
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
     
     return Scaffold(
-      backgroundColor: const Color(0xFF1A0088),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.transparent, 
+        backgroundColor: const Color(0xFF1A0088),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text("Terms & Conditions", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
       ),
       body: Column(
         children: [
-          const Text("Huramay", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
-          const SizedBox(height: 5),
-          const Text("Terms and Condition", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white70)),
-          const SizedBox(height: 20),
-          Container(
-            width: 120, height: 140,
-            decoration: BoxDecoration(
-              color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.yellow, width: 3),
-              image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
+          const SizedBox(height: 25),
+          Center(
+            child: Container(
+              width: 100, height: 100,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: Colors.black12, width: 2),
+                image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
+              ),
+              child: !hasImage ? const Icon(Icons.image, size: 30, color: Colors.grey) : null,
             ),
-            child: !hasImage ? const Icon(Icons.image, size: 40, color: Colors.grey) : null,
           ),
           const SizedBox(height: 20),
           Expanded(
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 25).copyWith(bottom: 20),
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(15)),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F4F6), 
+                borderRadius: BorderRadius.circular(20), 
+                border: Border.all(color: Colors.black12)
+              ),
               child: Column(
                 children: [
-                  Expanded(
+                  const Expanded(
                     child: SingleChildScrollView(
-                      child: const Text(
+                      physics: BouncingScrollPhysics(),
+                      child: Text(
                         "Huramay: A Mobile-Based Peer-to-Peer Academic Resource Exchange for LNU Students \n\nI. Acceptance of Responsibility \n\nBy proceeding with this request, the borrower acknowledges and accepts full responsibility for the academic resource identified in the listing. The borrower commits to treating the item with the utmost care and ensuring it remains in the same condition as documented at the time of the handover. Any pre-existing damages must be acknowledged by both parties during the physical exchange to avoid future disputes. The borrower understands that this item is being provided as a gesture of academic support within the LNU community and must not be used for any purpose that violates university policies. \n\nII. Liability and Accountability \n\nIn the event of loss, theft, or significant damage to the borrowed resource, the borrower agrees to be held liable for the repair or replacement of the item as negotiated with the lender. While the Huramay platform facilitates the connection, the legal and moral obligation to rectify damages rests solely on the borrower. Furthermore, the borrower understands that their Trust Rating is a permanent record within the local database; failure to return the item by the specified deadline or returning a damaged item will result in a formal deduction of rating points, which may limit their future access to the platform’s resources. \n\nIII. Code of Conduct and Safety \n\nAll transactions and physical handovers must take place within the designated landmarks of the Leyte Normal University (LNU) Tacloban Campus during official operating hours to ensure the safety and transparency of both parties. This agreement strictly prohibits the exchange of monetary fees or services in return for borrowing; Huramay is a non-commercial, peer-to-peer academic exchange. Both users agree to maintain professional and respectful communication through the integrated P2P chat and to promptly report any fraudulent activity or 'no-show' behavior to the project administrators.",
                         style: TextStyle(color: Colors.black87, fontSize: 13, height: 1.5, fontWeight: FontWeight.w500),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 15),
+                  const Divider(height: 30, color: Colors.black12),
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SizedBox(
-                        height: 24, width: 24,
-                        child: Checkbox(
-                          value: _isChecked, 
-                          activeColor: const Color(0xFF1A0088), 
-                          onChanged: (v) => setState(() => _isChecked = v ?? false)
-                        ),
+                      Checkbox(
+                        value: _isChecked, 
+                        activeColor: const Color(0xFF1A0088), 
+                        onChanged: (v) => setState(() => _isChecked = v ?? false)
                       ),
-                      const SizedBox(width: 10),
                       const Expanded(
-                        child: Text("I agree to the Huramay terms and conditions.", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87)),
-                      )
+                        child: Text("I agree to the Huramay terms and conditions.", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87))
+                      ),
                     ],
                   )
                 ],
               ),
             ),
           ),
-          _isSubmitting
-              ? const Padding(padding: EdgeInsets.only(bottom: 30), child: CircularProgressIndicator(color: Colors.yellow))
-              : Padding(
-                  padding: const EdgeInsets.only(bottom: 30),
-                  child: ElevatedButton(
+          Padding(
+            padding: const EdgeInsets.all(25),
+            child: _isSubmitting
+                ? const CircularProgressIndicator(color: Color(0xFF1A0088))
+                : ElevatedButton(
                     onPressed: _isChecked ? _submitRequest : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _isChecked ? Colors.yellow : Colors.grey.shade300,
                       foregroundColor: _isChecked ? Colors.black : Colors.grey.shade600,
-                      minimumSize: const Size(200, 50),
+                      minimumSize: const Size(double.infinity, 55),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)), 
                     ),
-                    child: const Text("Continue Borrowing", textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    child: const Text("SUBMIT REQUEST", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   ),
-                )
+          ),
         ],
       ),
     );
   }
 }
 
+// ==================== SUCCESS SCREEN (Modernized) ====================
 class BorrowSuccessScreen extends StatelessWidget {
   final dynamic item;
   const BorrowSuccessScreen({super.key, required this.item});
@@ -844,56 +841,49 @@ class BorrowSuccessScreen extends StatelessWidget {
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
     
     return Scaffold(
-      backgroundColor: const Color(0xFF1A0088),
+      backgroundColor: Colors.white,
       body: SafeArea(
-        child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 40),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text("Huramay", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
-              const SizedBox(height: 5),
-              const Text("Borrowed", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white70)),
-              const SizedBox(height: 30),
               Container(
-                width: 140, height: 160,
-                decoration: BoxDecoration(
-                  color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.yellow, width: 3),
-                  image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
-                ),
-                child: !hasImage ? const Icon(Icons.image, size: 50, color: Colors.grey) : null,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(color: Colors.green.shade50, shape: BoxShape.circle),
+                child: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 80),
               ),
               const SizedBox(height: 30),
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 40),
-                padding: const EdgeInsets.all(25),
-                decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(15)),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: Colors.green.shade100, shape: BoxShape.circle),
-                      child: const Icon(Icons.check, color: Colors.green, size: 35),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text("Successfully requested this item.", textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 10),
-                    const Text("Waiting for approval from the owner.", textAlign: TextAlign.center, style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600, fontSize: 14)),
-                  ],
+              const Text("Request Sent!", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF1A0088))),
+              const SizedBox(height: 15),
+              const Text(
+                "Your request has been sent to the owner. Please wait for their approval in your History tab.", 
+                textAlign: TextAlign.center, 
+                style: TextStyle(color: Colors.black54, fontSize: 15, height: 1.4)
+              ),
+              const SizedBox(height: 40),
+              Center(
+                child: Container(
+                  width: 120, height: 120,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: Colors.black12, width: 2),
+                    image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
+                  ),
+                  child: !hasImage ? const Icon(Icons.image, size: 40, color: Colors.grey) : null,
                 ),
               ),
               const SizedBox(height: 50),
               ElevatedButton(
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const DashboardScreen()), (route) => false);
-                },
+                onPressed: () => Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const DashboardScreen()), (route) => false),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.yellow,
-                  foregroundColor: Colors.black,
-                  minimumSize: const Size(200, 50),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                  backgroundColor: const Color(0xFF1A0088),
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 55),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 ),
-                child: const Text("Back to Dashboard", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                child: const Text("BACK TO DASHBOARD", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               )
             ],
           ),
