@@ -23,6 +23,7 @@ class User(db.Model):
     password = db.Column(db.String(255), nullable=False)
     photo_path = db.Column(db.String(255), nullable=True, default="")
     rating = db.Column(db.Float, default=5.0) 
+    is_admin = db.Column(db.Boolean, default=False)
     items = db.relationship('Item', backref='owner', lazy=True)
     favorites = db.relationship('Favorite', backref='user', lazy=True)
 
@@ -66,20 +67,28 @@ class ChatMessage(db.Model):
     Sender_ID = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     Receiver_ID = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     Message_Text = db.Column(db.Text, nullable=False)
-    Timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    Timestamp = db.Column(db.DateTime, default=datetime.now)
     Is_Read = db.Column(db.Boolean, default=False) 
 
-# NEW: Model for the Report Ticket
 class ReportItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     reporter_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     item_id = db.Column(db.Integer, db.ForeignKey('item.id'), nullable=False)
     report_text = db.Column(db.Text, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-
-    # Added relationships so we can easily fetch the user and item data
+    timestamp = db.Column(db.DateTime, default=datetime.now)
     reporter = db.relationship('User')
     item = db.relationship('Item')
+
+class Review(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    reviewer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    item_id = db.Column(db.Integer, db.ForeignKey('item.id'), nullable=False)
+    lender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    rating = db.Column(db.Integer, nullable=False)
+    comment = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.now)
+    
+    reviewer = db.relationship('User', foreign_keys=[reviewer_id])
 
 with app.app_context():
     db.create_all()
@@ -109,7 +118,7 @@ def login():
             "id": user.id, "full_name": user.full_name, "email": user.email,               
             "department": user.department, "photo_path": user.photo_path,     
             "rating": user.rating, 
-            "is_admin": user.email == 'admin@lnu.edu.ph',
+            "is_admin": user.email == 'admin@gmail.com' or user.is_admin,
             "message": "Login successful!"
         }), 200
     return jsonify({"message": "Invalid email or password"}), 401
@@ -278,14 +287,17 @@ def update_request_status(req_id):
     req = BorrowRequest.query.get(req_id)
     if not req:
         return jsonify({"message": "Request not found"}), 404
+        
     req.status = new_status
+    
     if new_status == 'Accepted' and req.item:
         req.item.status = 'Borrowed'
+    elif new_status == 'Returned' and req.item:
+        req.item.status = 'Available'
+        
     db.session.commit()
     return jsonify({"message": f"Request {new_status} successfully!"}), 200
 
-
-# TICKET VAVT-63: Submitting a report
 @app.route('/api/report', methods=['POST'])
 def submit_report():
     try:
@@ -301,39 +313,60 @@ def submit_report():
     except Exception as e:
         return jsonify({"message": f"Server Error: {str(e)}"}), 500
 
-# TICKET VAVT-63: Fetching ALL items that have reports (Community View)
 @app.route('/api/reports/all', methods=['GET'])
 def get_all_reports():
-    try:
-        # Fetch all reports, ordered by newest first
-        reports = ReportItem.query.order_by(ReportItem.timestamp.desc()).all()
-        
-        results = []
-        for r in reports:
-            # Check if item exists (in case it was deleted)
-            if r.item and r.reporter:
-                
-                # NEW: Safely handle the timestamp so it never crashes!
-                time_str = ""
-                if hasattr(r.timestamp, 'strftime'):
-                    time_str = r.timestamp.strftime("%b %d, %Y")
-                else:
-                    time_str = str(r.timestamp)[:10] # Just grabs the YYYY-MM-DD
-                
-                results.append({
-                    "report_id": r.id,
-                    "report_text": r.report_text,
-                    "timestamp": time_str,
-                    "reporter_name": r.reporter.full_name,
-                    "reporter_dept": r.reporter.department,
-                    "item_title": r.item.title,
-                    "item_image": r.item.item_image_path
-                })
-                
-        return jsonify(results), 200
-    except Exception as e:
-        print(f"CRITICAL ERROR IN REPORTS: {e}")
-        return jsonify({"message": str(e)}), 500
+    reports = ReportItem.query.order_by(ReportItem.timestamp.desc()).all()
+    results = []
+    for r in reports:
+        if r.item and r.reporter:
+            results.append({
+                "report_id": r.id,
+                "report_text": r.report_text,
+                "timestamp": r.timestamp.strftime("%b %d, %Y"),
+                "reporter_name": r.reporter.full_name,
+                "reporter_dept": r.reporter.department,
+                "item_title": r.item.title,
+                "item_image": r.item.item_image_path
+            })
+    return jsonify(results), 200
+
+# --- REVIEWS API ---
+@app.route('/api/review', methods=['POST'])
+def submit_review():
+    data = request.get_json()
+    lender = User.query.get(data['lender_id'])
+    
+    if lender:
+        new_rating = float(data['rating'])
+        if lender.rating == 5.0:
+            lender.rating = new_rating
+        else:
+            lender.rating = round((lender.rating + new_rating) / 2.0, 1)
+            
+        new_review = Review(
+            reviewer_id=data['reviewer_id'],
+            item_id=data['item_id'],
+            lender_id=data['lender_id'],
+            rating=int(new_rating),
+            comment=data['review_text']
+        )
+        db.session.add(new_review)
+        db.session.commit()
+        return jsonify({"message": "Review submitted successfully!"}), 201
+    return jsonify({"message": "Lender not found"}), 404
+
+@app.route('/api/reviews/item/<int:item_id>', methods=['GET'])
+def get_item_reviews(item_id):
+    reviews = Review.query.filter_by(item_id=item_id).order_by(Review.timestamp.desc()).all()
+    results = []
+    for r in reviews:
+        results.append({
+            "reviewer_name": r.reviewer.full_name if r.reviewer else "Unknown",
+            "rating": r.rating,
+            "comment": r.comment,
+            "date": r.timestamp.strftime("%b %d, %Y")
+        })
+    return jsonify(results), 200
 
 # --- CHATS / MESSAGING ROUTES ---
 @app.route('/api/messages/inbox/<int:user_id>', methods=['GET'])
@@ -407,17 +440,57 @@ def mark_messages_read():
     return jsonify({"message": "Marked as read"}), 200
 
 # --- ADMIN ROUTES ---
+@app.route('/api/admins', methods=['GET'])
+def get_admins():
+    admins = User.query.filter((User.is_admin == True) | (User.email == 'admin@gmail.com')).all()
+    return jsonify([{
+        "id": a.id, 
+        "full_name": a.full_name, 
+        "email": a.email
+    } for a in admins]), 200
+
+@app.route('/api/admins/create', methods=['POST'])
+def create_admin():
+    data = request.get_json()
+    if User.query.filter_by(email=data['email']).first():
+        return jsonify({"message": "Email already registered"}), 400
+    
+    hashed_pass = bcrypt.generate_password_hash(data['password']).decode('utf-8')
+    new_admin = User(
+        full_name=data['full_name'], 
+        email=data['email'], 
+        department="Admin", 
+        password=hashed_pass, 
+        is_admin=True
+    )
+    db.session.add(new_admin)
+    db.session.commit()
+    return jsonify({"message": "Admin created successfully!"}), 201
+
+@app.route('/api/admins/<int:admin_id>', methods=['DELETE'])
+def delete_admin(admin_id):
+    admin_to_delete = User.query.get(admin_id)
+    if not admin_to_delete:
+        return jsonify({"message": "Admin not found"}), 404
+        
+    if admin_to_delete.email == 'admin@gmail.com':
+        return jsonify({"message": "Access Denied: Cannot delete the Super Admin"}), 403
+        
+    db.session.delete(admin_to_delete)
+    db.session.commit()
+    return jsonify({"message": "Admin deleted successfully"}), 200
+
 @app.route('/api/users/<int:user_id>', methods=['DELETE'])
 def ban_user(user_id):
     user = User.query.get(user_id)
     if not user:
         return jsonify({"message": "User not found"}), 404
     
-    try:
-        # Robustness Check: Delete all items owned by the user to avoid crashing the student feed
-        Item.query.filter_by(user_id=user_id).delete()
+    if user.email == 'admin@gmail.com':
+        return jsonify({"message": "Access Denied"}), 403
         
-        # Finally, delete the user
+    try:
+        Item.query.filter_by(user_id=user_id).delete()
         db.session.delete(user)
         db.session.commit()
         return jsonify({"message": "User and their items have been banned/deleted"}), 200
@@ -427,7 +500,6 @@ def ban_user(user_id):
 
 def _item_to_dict(i):
     if not i: return {}
-    
     return {
         "id": i.id,
         "title": i.title,

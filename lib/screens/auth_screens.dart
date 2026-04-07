@@ -24,7 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> doLogin() async {
     try {
       var res = await http.post(
-        Uri.parse('http://10.33.87.39:5000/api/login'), 
+        Uri.parse('http://10.174.134.39:5000/api/login'), 
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': _emailCtrl.text, 'password': _passCtrl.text}),
       );
@@ -120,7 +120,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     
     try {
       var res = await http.post(
-        Uri.parse('http://10.33.87.39:5000/api/register'),
+        Uri.parse('http://10.174.134.39:5000/api/register'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'full_name': _nameCtrl.text, 'email': emailInput, 'department': _selectedDept, 'password': _passCtrl.text}),
       );
@@ -219,7 +219,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _saveProfile() async {
     try {
       var res = await http.post(
-        Uri.parse('http://10.33.87.39:5000/api/user/update'),
+        Uri.parse('http://10.174.134.39:5000/api/user/update'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'id': currentUser!['id'], 'photo_path': _localPhotoPath ?? ""}),
       );
@@ -336,7 +336,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty || _passCtrl.text != _confCtrl.text) return;
     try {
       var res = await http.post(
-        Uri.parse('http://10.33.87.39:5000/api/user/reset_password'),
+        Uri.parse('http://10.174.134.39:5000/api/user/reset_password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': _emailCtrl.text, 'new_password': _passCtrl.text, 'current_user_id': currentUser!['id']}),
       );

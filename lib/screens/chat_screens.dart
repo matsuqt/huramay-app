@@ -26,7 +26,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   Future<void> _fetchInbox() async {
     setState(() => isLoading = true);
     try {
-      final res = await http.get(Uri.parse('http://10.33.87.39:5000/api/messages/inbox/${currentUser!['id']}'));
+      final res = await http.get(Uri.parse('http://10.174.134.39:5000/api/messages/inbox/${currentUser!['id']}'));
       if (res.statusCode == 200) {
         setState(() { threads = jsonDecode(res.body); });
       }
@@ -209,7 +209,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   Future<void> _loadHistory() async {
     try {
-      final res = await http.get(Uri.parse('http://10.33.87.39:5000/api/messages/history/${widget.chatRoomId}'));
+      final res = await http.get(Uri.parse('http://10.174.134.39:5000/api/messages/history/${widget.chatRoomId}'));
       if (res.statusCode == 200) {
         setState(() {
           messages.clear();
@@ -228,7 +228,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Future<void> _markMessagesAsRead() async {
     try {
       await http.post(
-        Uri.parse('http://10.33.87.39:5000/api/messages/read'),
+        Uri.parse('http://10.174.134.39:5000/api/messages/read'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'chat_room_id': widget.chatRoomId,
@@ -244,7 +244,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     _msgCtrl.clear();
     try {
       await http.post(
-        Uri.parse('http://10.33.87.39:5000/api/messages/send'),
+        Uri.parse('http://10.174.134.39:5000/api/messages/send'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'chat_room_id': widget.chatRoomId,

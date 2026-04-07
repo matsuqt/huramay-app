@@ -26,7 +26,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   Future<void> _fetchAllReports() async {
     try {
-      final res = await http.get(Uri.parse('http://10.33.87.39:5000/api/reports/all'));
+      final res = await http.get(Uri.parse('http://10.174.134.39:5000/api/reports/all'));
       if (res.statusCode == 200) {
         setState(() {
           allReports = jsonDecode(res.body);
@@ -83,7 +83,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
               const SizedBox(height: 15),
               _modalText("Item", report['item_title']),
-              _modalText("Borrower Name", report['reporter_name']),
+              _modalText("Reporter Name", report['reporter_name']),
               _modalText("Department", report['reporter_dept']),
               _modalText("Review Report", report['report_text'], isSmall: true),
             ],

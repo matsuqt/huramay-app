@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
-import '../globals.dart';
-import '../widgets/app_sidebar.dart';
-import 'auth_screens.dart';
 
+import '../globals.dart';
+import 'auth_screens.dart'; // Needed for LoginScreen routing
+
+// =========================================================================
+// 1. ADMIN DASHBOARD
+// =========================================================================
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
 
@@ -28,7 +31,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Future<void> _fetchAllItems() async {
     setState(() => isLoading = true);
     try {
-      String url = 'http://10.33.87.39:5000/api/items';
+      String url = 'http://10.174.134.39:5000/api/items';
       String searchQuery = _searchCtrl.text.trim();
       if (searchQuery.isNotEmpty) {
         url += '?search=${Uri.encodeComponent(searchQuery)}';
@@ -49,7 +52,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Future<void> _executeDelete(int itemId) async {
     try {
-      final res = await http.delete(Uri.parse('http://10.33.87.39:5000/api/items/$itemId'));
+      final res = await http.delete(Uri.parse('http://10.174.134.39:5000/api/items/$itemId'));
       if (res.statusCode == 200) {
         _fetchAllItems();
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Item Deleted permanently.")));
@@ -61,7 +64,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Future<void> _executeBan(int userId) async {
     try {
-      final res = await http.delete(Uri.parse('http://10.33.87.39:5000/api/users/$userId'));
+      final res = await http.delete(Uri.parse('http://10.174.134.39:5000/api/users/$userId'));
       if (res.statusCode == 200) {
         _fetchAllItems();
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User Banned permanently.")));
@@ -75,69 +78,46 @@ class _AdminDashboardState extends State<AdminDashboard> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A0088))),
         content: Text(content),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel", style: TextStyle(color: Colors.grey))),
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF1A0088),
+              side: const BorderSide(color: Color(0xFF1A0088), width: 1.5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
+            child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
               onConfirm();
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text("Confirm", style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
+            child: const Text("Confirm", style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
   }
 
-  // TICKET VAVT-54: Detailed View (Deep Dive Modal)
-  void _showItemDetails(dynamic item) {
+  void _openAdminReportModal(dynamic item) {
     showDialog(
       context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          title: Text(
-            item['title'] ?? 'Item Details', 
-            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A0088))
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text("Owner: ${item['owner']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                Text("Department: ${item['dept']}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                const SizedBox(height: 15),
-                const Text("Full Description:", style: TextStyle(fontWeight: FontWeight.bold)),
-                Text(item['description'] ?? 'No description provided.', style: const TextStyle(fontSize: 14)),
-                const SizedBox(height: 15),
-                Text("Status: ${item['status']}", style: TextStyle(fontWeight: FontWeight.bold, color: item['status'] == 'Flagged' ? Colors.red : const Color(0xFF1A0088))),
-              ],
-            ),
-          ),
-          actionsAlignment: MainAxisAlignment.spaceEvenly,
-          actions: [
-            _adminBtn("Review", Colors.blueAccent, () {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Opening reports... (Review module pending)")));
-            }, textColor: Colors.white),
-            
-            _adminBtn("Ban", Colors.yellow, () {
-              Navigator.pop(ctx);
-              _showConfirmation("Ban User", "Are you sure you want to ban ${item['owner']}? This deletes their account and items.", () => _executeBan(item['user_id']));
-            }),
-            
-            _adminBtn("Delete", Colors.red, () {
-              Navigator.pop(ctx);
-              _showConfirmation("Delete Item", "Are you sure you want to permanently delete '${item['title']}'?", () => _executeDelete(item['id']));
-            }, textColor: Colors.white),
-          ],
-        );
-      },
+      builder: (ctx) => AdminReportOverlay(
+        itemData: item,
+        onReportSubmitted: () {
+          _fetchAllItems(); 
+        },
+      ),
     );
   }
 
@@ -167,12 +147,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ),
         actions: [
           IconButton(
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context, 
+                MaterialPageRoute(builder: (c) => const AdminProfileScreen())
+              );
+            },
             icon: const Icon(Icons.account_circle, size: 30),
           )
         ],
       ),
-      drawer: const AppSidebar(),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -205,12 +189,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget _buildAdminCard(dynamic item) {
     String? imgPath = item['image'];
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
-    
-    // TICKET VAVT-54: Flagged State Logic
     bool isFlagged = item['status']?.toString().toLowerCase() == 'flagged';
 
     return GestureDetector(
-      onTap: () => _showItemDetails(item), // TICKET VAVT-54: Trigger Deep Dive Modal
+      onTap: () => _openAdminReportModal(item), 
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         child: IntrinsicHeight(
@@ -222,14 +204,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: isFlagged ? Colors.red : const Color(0xFF1A0088), width: 2), // Red border if flagged
+                  border: Border.all(color: isFlagged ? Colors.red : const Color(0xFF1A0088), width: 2),
                   image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
                 ),
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
                     if (!hasImage) const Icon(Icons.image, size: 40, color: Colors.grey),
-                    // TICKET VAVT-54: Red cancellation symbol overlay
                     if (isFlagged)
                       Container(
                         width: double.infinity,
@@ -248,11 +229,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 child: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFCCCCCC), 
+                    color: const Color(0xFFF3F4F6), 
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade500, width: 1),
+                    border: Border.all(color: Colors.black12, width: 1),
                     boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 3, offset: const Offset(0, 2))
+                      BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
                     ]
                   ),
                   child: Column(
@@ -288,7 +269,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      // TICKET VAVT-54: Morphing Buttons based on Flagged state
                       if (isFlagged)
                         Center(
                           child: _adminBtn("Delete Flagged Item", Colors.red, () {
@@ -299,8 +279,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            _adminBtn("Ban", Colors.yellow, () {
-                              _showConfirmation("Ban User", "Are you sure you want to ban ${item['owner']}? This will permanently delete their account and all their items.", () => _executeBan(item['user_id']));
+                            _adminBtn("Review", Colors.yellow, () {
+                              _openAdminReportModal(item);
                             }),
                             _adminBtn("Delete", Colors.yellow, () {
                               _showConfirmation("Delete Item", "Are you sure you want to permanently delete '${item['title']}' from the feed?", () => _executeDelete(item['id']));
@@ -318,7 +298,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  // UPDATED: Added textColor parameter for flexibility (e.g., white text on red background)
   Widget _adminBtn(String text, Color color, VoidCallback action, {Color textColor = Colors.black}) {
     return GestureDetector(
       onTap: action,
@@ -327,14 +306,528 @@ class _AdminDashboardState extends State<AdminDashboard> {
         decoration: BoxDecoration(
           color: color,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.black54, width: 1),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 2, offset: const Offset(0, 2))]
+          border: Border.all(color: Colors.black12, width: 1),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 2, offset: const Offset(0, 2))]
         ),
         child: Text(
           text,
           style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
         ),
       ),
+    );
+  }
+}
+
+// =========================================================================
+// 2. THE ADMIN REPORT OVERLAY DIALOG 
+// =========================================================================
+class AdminReportOverlay extends StatefulWidget {
+  final dynamic itemData;
+  final VoidCallback onReportSubmitted;
+
+  const AdminReportOverlay({super.key, required this.itemData, required this.onReportSubmitted});
+
+  @override
+  State<AdminReportOverlay> createState() => _AdminReportOverlayState();
+}
+
+class _AdminReportOverlayState extends State<AdminReportOverlay> {
+  final TextEditingController _reportTextCtrl = TextEditingController();
+  bool isSubmitting = false;
+
+  void _handleReport() {
+    if (_reportTextCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please type a report details first.")));
+      return;
+    }
+    _showConfirmation(); 
+  }
+
+  void _showConfirmation() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "Are you sure you want to report?",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 25),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF1A0088),
+                    side: const BorderSide(color: Color(0xFF1A0088), width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    minimumSize: const Size(90, 40),
+                  ),
+                  child: const Text("No", style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context); 
+                    _submitReportToBackend(); 
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.yellow,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    minimumSize: const Size(90, 40),
+                    elevation: 0,
+                  ),
+                  child: const Text("Yes", style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submitReportToBackend() async {
+    setState(() => isSubmitting = true);
+    try {
+      final res = await http.post(
+        Uri.parse('http://10.174.134.39:5000/api/report'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'reporter_id': currentUser!['id'], 
+          'item_id': widget.itemData['id'],
+          'report_text': _reportTextCtrl.text.trim()
+        }),
+      );
+      if (res.statusCode == 201) {
+        if(mounted) Navigator.pop(context); 
+        if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Report submitted successfully.")));
+        widget.onReportSubmitted(); 
+      }
+    } catch (e) {
+      debugPrint("Report Submission Error: $e");
+    } finally {
+      if(mounted) setState(() => isSubmitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    String? imgPath = widget.itemData['image'];
+    bool hasImage = imgPath != null && imgPath.isNotEmpty;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(20),
+      child: Container(
+        width: double.infinity,
+        height: MediaQuery.of(context).size.height * 0.65, 
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white, 
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 5))],
+        ),
+        child: Column(
+          children: [
+            Align(
+              alignment: Alignment.topLeft,
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.blue.shade50, shape: BoxShape.circle),
+                  child: const Icon(Icons.close, size: 18, color: Color(0xFF1A0088)),
+                ),
+              ),
+            ),
+            Container(
+              width: 130,
+              height: 130,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: const Color(0xFF1A0088), width: 3),
+                image: hasImage ? DecorationImage(image: FileImage(File(imgPath)), fit: BoxFit.cover) : null,
+              ),
+              child: !hasImage ? const Icon(Icons.image, size: 50, color: Colors.grey) : null,
+            ),
+            const SizedBox(height: 20),
+            const Text("Type here your report", style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 10),
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6), 
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: Colors.black12)
+                ),
+                child: TextField(
+                  controller: _reportTextCtrl,
+                  maxLines: null, 
+                  keyboardType: TextInputType.multiline,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.all(15),
+                    hintText: "Enter formal flag reason or note...",
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            isSubmitting 
+              ? const CircularProgressIndicator()
+              : ElevatedButton(
+                  onPressed: _handleReport, 
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                    padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 12),
+                    elevation: 0,
+                  ),
+                  child: const Text("Report", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                )
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =========================================================================
+// 3. ADMIN PROFILE SCREEN
+// =========================================================================
+class AdminProfileScreen extends StatelessWidget {
+  const AdminProfileScreen({super.key});
+
+  void _logout(BuildContext context) {
+    currentUser = null;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (c) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1A0088),
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text("Admin Profile", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.yellow, width: 3),
+              ),
+              child: const CircleAvatar(
+                radius: 60,
+                backgroundColor: Color(0xFF1A0088),
+                child: Icon(Icons.admin_panel_settings, size: 70, color: Colors.white),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              currentUser?['full_name'] ?? "System Administrator",
+              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1A0088)),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              currentUser?['email'] ?? "admin@gmail.com",
+              style: const TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 40),
+            
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.push(context, MaterialPageRoute(builder: (c) => const AdminManagementScreen()));
+              },
+              icon: const Icon(Icons.manage_accounts),
+              label: const Text("Manage Admins", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF1A0088),
+                side: const BorderSide(color: Color(0xFF1A0088), width: 2),
+                minimumSize: const Size(200, 50),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+              ),
+            ),
+            
+            const SizedBox(height: 15),
+
+            ElevatedButton.icon(
+              onPressed: () => _logout(context),
+              icon: const Icon(Icons.logout, color: Colors.black),
+              label: const Text("Logout", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.yellow,
+                minimumSize: const Size(200, 50),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                elevation: 0,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =========================================================================
+// 4. ADMIN MANAGEMENT SCREEN (Super Admin Protection & Error Handling)
+// =========================================================================
+class AdminManagementScreen extends StatefulWidget {
+  const AdminManagementScreen({super.key});
+
+  @override
+  State<AdminManagementScreen> createState() => _AdminManagementScreenState();
+}
+
+class _AdminManagementScreenState extends State<AdminManagementScreen> {
+  List<dynamic> adminList = [];
+  bool isLoading = true;
+
+  final String superAdminEmail = "admin@gmail.com"; 
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAdmins();
+  }
+
+  Future<void> _fetchAdmins() async {
+    setState(() => isLoading = true);
+    try {
+      final res = await http.get(Uri.parse('http://10.174.134.39:5000/api/admins'));
+      if (res.statusCode == 200) {
+        setState(() => adminList = jsonDecode(res.body));
+      }
+    } catch (e) {
+      debugPrint("Fetch admins error: $e");
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _deleteAdmin(int id, String email) async {
+    if (email == superAdminEmail) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Action Denied: Cannot delete the Super Admin.")));
+      return;
+    }
+
+    try {
+      final res = await http.delete(Uri.parse('http://10.174.134.39:5000/api/admins/$id'));
+      if (res.statusCode == 200) {
+        _fetchAdmins();
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Admin account deleted.")));
+      }
+    } catch (e) {
+      debugPrint("Delete admin error: $e");
+    }
+  }
+
+  void _showAddAdminModal() {
+    final _nameCtrl = TextEditingController();
+    final _emailCtrl = TextEditingController();
+    final _passCtrl = TextEditingController();
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            title: const Text("Create New Admin", style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: _nameCtrl,
+                    decoration: InputDecoration(labelText: "Full Name", filled: true, fillColor: Colors.grey.shade100, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _emailCtrl,
+                    decoration: InputDecoration(labelText: "Email (@gmail.com)", filled: true, fillColor: Colors.grey.shade100, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _passCtrl,
+                    obscureText: true,
+                    decoration: InputDecoration(labelText: "Password", filled: true, fillColor: Colors.grey.shade100, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              OutlinedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF1A0088), side: const BorderSide(color: Color(0xFF1A0088), width: 1.5)),
+                child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              isSubmitting 
+                ? const CircularProgressIndicator() 
+                : ElevatedButton(
+                    onPressed: () async {
+                      // 1. Validation Check
+                      if (_nameCtrl.text.trim().isEmpty || _emailCtrl.text.trim().isEmpty || _passCtrl.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill all fields.")));
+                        return;
+                      }
+                      
+                      setModalState(() => isSubmitting = true);
+                      
+                      try {
+                        final res = await http.post(
+                          Uri.parse('http://10.174.134.39:5000/api/admins/create'),
+                          headers: {'Content-Type': 'application/json'},
+                          body: jsonEncode({
+                            'full_name': _nameCtrl.text.trim(),
+                            'email': _emailCtrl.text.trim(),
+                            'password': _passCtrl.text.trim(),
+                            'is_admin': true 
+                          }),
+                        );
+                        
+                        // 2. Success Check
+                        if (res.statusCode == 201) {
+                          if (context.mounted) Navigator.pop(ctx);
+                          _fetchAdmins();
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Admin created successfully!")));
+                        } else {
+                          // 3. Backend Error Check (e.g. Email already exists)
+                          final data = jsonDecode(res.body);
+                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: ${data['message']}")));
+                        }
+                      } catch (e) {
+                        // 4. Server Offline Check
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Server Error: Unable to connect.")));
+                      } finally {
+                        setModalState(() => isSubmitting = false);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A0088), foregroundColor: Colors.white),
+                    child: const Text("Create", style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+            ],
+          );
+        }
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1A0088),
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text("Manage Admins", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddAdminModal,
+        backgroundColor: Colors.yellow,
+        foregroundColor: Colors.black,
+        icon: const Icon(Icons.add),
+        label: const Text("Add Admin", style: TextStyle(fontWeight: FontWeight.bold)),
+      ),
+      body: isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: adminList.length,
+            itemBuilder: (context, index) {
+              final admin = adminList[index];
+              bool isSuperAdmin = admin['email'] == superAdminEmail;
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 15),
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: Colors.black12)
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(admin['full_name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
+                            if (isSuperAdmin) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(color: Colors.yellow, borderRadius: BorderRadius.circular(10)),
+                                child: const Text("Super Admin", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                              )
+                            ]
+                          ],
+                        ),
+                        Text(admin['email'], style: const TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                    // HIDE DELETE BUTTON IF IT'S THE SUPER ADMIN
+                    if (!isSuperAdmin)
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        onPressed: () {
+                          // Added a modern confirmation dialog for deleting an admin
+                          showDialog(
+                            context: context,
+                            builder: (deleteCtx) => AlertDialog(
+                              backgroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                              title: const Text("Delete Admin?", style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold)),
+                              content: Text("Are you sure you want to permanently delete the admin account for '${admin['email']}'?"),
+                              actions: [
+                                OutlinedButton(
+                                  onPressed: () => Navigator.pop(deleteCtx),
+                                  style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF1A0088), side: const BorderSide(color: Color(0xFF1A0088), width: 1.5)),
+                                  child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.pop(deleteCtx);
+                                    _deleteAdmin(admin['id'], admin['email']);
+                                  },
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                                  child: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            )
+                          );
+                        },
+                      )
+                  ],
+                ),
+              );
+            },
+          ),
     );
   }
 }

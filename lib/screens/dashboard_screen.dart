@@ -31,7 +31,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _fetchItems() async {
     setState(() => isLoading = true);
     try {
-      String url = 'http://10.33.87.39:5000/api/items';
+      String url = 'http://10.174.134.39:5000/api/items';
       List<String> queryParams = [];
       
       if (_currentFilter != null && _currentFilter != 'All') {
@@ -76,8 +76,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onChanged: (value) => _fetchItems(), 
             decoration: const InputDecoration(
               hintText: "Search",
-              prefixIcon: Icon(Icons.search),
+              prefixIcon: Icon(Icons.search, color: Colors.grey), // Icons can stay grey, text should be black
               border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(vertical: 8),
             ),
           ),
         ),
@@ -110,7 +111,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 Row(
                   children: [
-                    const Text("Filters ", style: TextStyle(fontSize: 12, color: Colors.black54)),
+                    // CHANGED TO BLACK
+                    const Text("Filters ", style: TextStyle(fontSize: 12, color: Colors.black, fontWeight: FontWeight.bold)),
                     Container(
                       height: 35,
                       padding: const EdgeInsets.symmetric(horizontal: 5),
@@ -122,7 +124,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           items: ['Available', 'Borrowed'].map((String value) {
                             return DropdownMenuItem<String>(
                               value: value,
-                              child: Text(value, style: const TextStyle(fontSize: 12)),
+                              child: Text(value, style: const TextStyle(fontSize: 12, color: Colors.black)),
                             );
                           }).toList(),
                           onChanged: (newValue) {
@@ -143,13 +145,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               : items.isEmpty 
                   ? _emptyStateDashboard() 
                   : ListView.builder(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.only(bottom: 80), // Padding so FAB doesn't cover last item
                       itemCount: items.length,
                       itemBuilder: (c, i) => _itemCard(context, items[i]),
                     ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      
+      floatingActionButton: FloatingActionButton(
         onPressed: () async {
           await Navigator.push(
             context,
@@ -157,13 +162,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
           _fetchItems();
         },
-        backgroundColor: const Color(0xFFFDEB00),
-        label: const Text(
-          "Add Item",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-        ),
+        backgroundColor: const Color(0xFF1A0088), 
+        foregroundColor: Colors.white,
+        elevation: 4,
+        child: const Icon(Icons.add, size: 30),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
@@ -177,14 +181,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.block, size: 80, color: Colors.black87),
+          const Icon(Icons.inventory_2_outlined, size: 80, color: Colors.grey),
           const SizedBox(height: 10),
           Text(
             message,
             textAlign: TextAlign.center,
+            // CHANGED TO BLACK
             style: const TextStyle(
-              color: Colors.red,
-              fontSize: 32,
+              color: Colors.black,
+              fontSize: 24,
               fontWeight: FontWeight.bold,
               height: 1.2,
             ),
@@ -197,70 +202,107 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _itemCard(BuildContext context, dynamic item) {
     String? imgPath = item['image'];
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              image: hasImage 
-                ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) 
-                : null,
+    bool isAvailable = item['status']?.toString().toLowerCase() == 'available';
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (c) => DetailedItemScreen(item: item)),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6), 
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: Colors.black12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03), 
+              blurRadius: 5, 
+              offset: const Offset(0, 3)
+            )
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 90,
+              height: 90,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF1A0088), width: 1.5), 
+                image: hasImage 
+                  ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) 
+                  : null,
+              ),
+              child: !hasImage ? const Icon(Icons.image, size: 35, color: Colors.grey) : null,
             ),
-            child: !hasImage ? const Icon(Icons.image, size: 40, color: Colors.grey) : null,
-          ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item['owner'],
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue),
-                ),
-                Text(
-                  item['title'],
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  "Qty: ${item['quantity']} | Cond: ${item['condition']}",
-                  style: const TextStyle(fontSize: 12, color: Colors.black54),
-                ),
-                Text(
-                  item['status'],
-                  style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 5),
-                Row(
-                  children: [
-                    miniBtn("Read", Colors.yellow, () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (c) => DetailedItemScreen(item: item)),
-                      );
-                    }), 
-                    const SizedBox(width: 10), 
-                    miniBtn("Borrow", Colors.yellow, () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (c) => DetailedItemScreen(item: item)),
-                      );
-                    })
-                  ],
-                ),
-              ],
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item['owner'],
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A0088), fontSize: 13),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isAvailable ? Colors.green.shade50 : Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: isAvailable ? Colors.green : Colors.red, width: 0.5),
+                        ),
+                        child: Text(
+                          item['status'],
+                          style: TextStyle(
+                            color: isAvailable ? Colors.green : Colors.red, 
+                            fontWeight: FontWeight.bold, 
+                            fontSize: 10
+                          ),
+                        ),
+                      )
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item['title'],
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    "Qty: ${item['quantity']}  •  Cond: ${item['condition']}",
+                    // CHANGED TO BLACK
+                    style: const TextStyle(fontSize: 12, color: Colors.black, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  const Align(
+                    alignment: Alignment.bottomRight,
+                    child: Text(
+                      "Tap to view details", 
+                      // CHANGED TO BLACK
+                      style: TextStyle(fontSize: 10, color: Colors.black, fontStyle: FontStyle.italic)
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -11,7 +11,7 @@ import '../screens/chat_screens.dart';
 import '../screens/borrowing_screens.dart';
 import '../screens/history_screen.dart';
 import '../screens/admin_dashboard.dart'; 
-import '../screens/reports_screen.dart'; // NEW IMPORT
+import '../screens/reports_screen.dart';
 
 // ==================== GLOBAL SIDEBAR ====================
 class AppSidebar extends StatefulWidget {
@@ -33,11 +33,14 @@ class _AppSidebarState extends State<AppSidebar> {
   Future<void> _fetchUnreadCount() async {
     if (currentUser == null) return;
     try {
-      final res = await http.get(Uri.parse('http://10.33.87.39:5000/api/messages/unread/${currentUser!['id']}'));
+      // FIXED: Now uses $baseUrl so it never breaks when your Wi-Fi changes!
+      final res = await http.get(Uri.parse('$baseUrl/api/messages/unread/${currentUser!['id']}'));
       if (res.statusCode == 200) {
-        setState(() {
-          unreadCount = jsonDecode(res.body)['unread_count'];
-        });
+        if (mounted) {
+          setState(() {
+            unreadCount = jsonDecode(res.body)['unread_count'];
+          });
+        }
       }
     } catch (e) {
       debugPrint("Badge Error: $e");
@@ -46,34 +49,53 @@ class _AppSidebarState extends State<AppSidebar> {
 
   @override
   Widget build(BuildContext context) {
-    bool isAdmin = currentUser?['is_admin'] ?? false; // Check if the user is an admin
+    bool isAdmin = currentUser?['is_admin'] ?? false; 
+    
+    // Extracting initials for the modern avatar
+    String userName = currentUser?['full_name'] ?? "User";
+    String initial = userName.isNotEmpty ? userName[0].toUpperCase() : "U";
 
     return Drawer(
-      backgroundColor: const Color(0xFFD9D9D9), 
+      backgroundColor: Colors.white, // Clean white background
       child: Column(
         children: [
-          const SizedBox(height: 60),
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: EdgeInsets.only(left: 20.0),
-              child: Icon(Icons.menu, size: 30, color: Colors.black),
+          // Modern User Header in LNU Blue
+          UserAccountsDrawerHeader(
+            decoration: const BoxDecoration(
+              color: Color(0xFF1A0088),
+            ),
+            accountName: Text(
+              userName, 
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
+            ),
+            accountEmail: Text(
+              currentUser?['department'] ?? "No Department",
+              style: const TextStyle(fontSize: 12, color: Colors.white70),
+            ),
+            currentAccountPicture: CircleAvatar(
+              backgroundColor: Colors.white,
+              child: Text(
+                initial,
+                style: const TextStyle(
+                  fontSize: 24, 
+                  color: Color(0xFF1A0088), 
+                  fontWeight: FontWeight.bold
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 20),
+          
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: EdgeInsets.zero,
               children: [
-                // Only show this button if they are an admin
-                if (isAdmin)
-                  _figmaMenuBtn(context, "Admin Panel", Icons.admin_panel_settings),
-
-                _figmaMenuBtn(context, "Dashboard", Icons.dashboard_outlined),
-                _figmaMenuBtn(context, "My Items", Icons.inventory_2_outlined),
-                _figmaMenuBtn(context, "Department Filters", Icons.filter_list),
-                _figmaMenuBtn(context, "Favorites", Icons.favorite_border),
-                _figmaMenuBtn(
+                _modernMenuBtn(context, "Dashboard", Icons.dashboard_outlined),
+                _modernMenuBtn(context, "My Items", Icons.inventory_2_outlined),
+                _modernMenuBtn(context, "Department Filters", Icons.filter_list),
+                _modernMenuBtn(context, "Favorites", Icons.favorite_border),
+                
+                // Messages with a modern badge
+                _modernMenuBtn(
                   context, "Messages", Icons.message_outlined, 
                   trailing: unreadCount > 0 
                     ? Container(
@@ -81,71 +103,90 @@ class _AppSidebarState extends State<AppSidebar> {
                         decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
                         child: Text(
                           unreadCount.toString(), 
-                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)
+                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)
                         ),
                       )
                     : null
                 ),
-                _figmaMenuBtn(context, "History", Icons.history),
-                _figmaMenuBtn(context, "Report", Icons.report_gmailerrorred),
-                _figmaMenuBtn(context, "Requests", Icons.notifications_none),
-                const SizedBox(height: 20),
-                _figmaMenuBtn(context, "Logout", Icons.logout, isLogout: true),
+                
+                _modernMenuBtn(context, "History", Icons.history),
+                _modernMenuBtn(context, "Requests", Icons.notifications_none),
+                
+                // FIXED: Moved the Reports button here so EVERYONE can see it!
+                _modernMenuBtn(context, "Reports", Icons.report_gmailerrorred),
+                
+                // Admin Section (Only Admins see the Admin Panel)
+                if (isAdmin) ...[
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    child: Divider(color: Colors.black12, thickness: 1),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.only(left: 20, bottom: 5),
+                    child: Text("ADMIN CONTROLS", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1.2)),
+                  ),
+                  _modernMenuBtn(context, "Admin Panel", Icons.admin_panel_settings_outlined, isHighlight: true),
+                ],
               ],
             ),
           ),
+          
+          // Logout anchored at the bottom
+          const Divider(color: Colors.black12, thickness: 1),
+          _modernMenuBtn(context, "Logout", Icons.logout, isLogout: true),
+          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  Widget _figmaMenuBtn(BuildContext context, String title, IconData icon, {bool isLogout = false, Widget? trailing}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: Container(
-        height: 45,
-        decoration: BoxDecoration(
-          color: const Color(0xFFFDEB00),
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))],
-        ),
-        child: ListTile(
-          dense: true,
-          visualDensity: const VisualDensity(vertical: -3),
-          title: Text(title, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
-          trailing: trailing,
-          onTap: () {
-            if (isLogout) {
-              currentUser = null;
-              Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const LoginScreen()), (route) => false);
-            } else if (title == "Admin Panel") {
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const AdminDashboard()));
-            } else if (title == "My Items") {
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const MyItemsScreen()));
-            } else if (title == "Dashboard") {
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const DashboardScreen()));
-            } else if (title == "Department Filters") {
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const DepartmentScreen()));
-            } else if (title == "Favorites") {
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const FavoritesScreen()));
-            } else if (title == "Messages") {
-              Navigator.pop(context); 
-              Navigator.push(context, MaterialPageRoute(builder: (c) => const ChatInboxScreen()));
-            } else if (title == "History") {
-              Navigator.pop(context);
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const HistoryScreen()));
-            } else if (title == "Requests") {
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const RequestsScreen()));
-            } else if (title == "Report") {
-              // TICKET VAVT-63: Route to the new Reports Page
-              Navigator.pop(context); // Close the side menu first
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const ReportsScreen()));
-            } else {
-              Navigator.pop(context); 
-            }
-          },
-        ),
+  // Modernized Menu Button Logic
+  Widget _modernMenuBtn(BuildContext context, String title, IconData icon, {bool isLogout = false, bool isHighlight = false, Widget? trailing}) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 25),
+      leading: Icon(
+        icon, 
+        size: 24, 
+        color: isLogout ? Colors.red : (isHighlight ? const Color(0xFF1A0088) : Colors.black87)
       ),
+      title: Text(
+        title, 
+        style: TextStyle(
+          color: isLogout ? Colors.red : (isHighlight ? const Color(0xFF1A0088) : Colors.black87), 
+          fontWeight: FontWeight.w600, 
+          fontSize: 15
+        )
+      ),
+      trailing: trailing,
+      onTap: () {
+        if (isLogout) {
+          currentUser = null;
+          Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const LoginScreen()), (route) => false);
+        } else if (title == "Admin Panel") {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const AdminDashboard()));
+        } else if (title == "My Items") {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const MyItemsScreen()));
+        } else if (title == "Dashboard") {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const DashboardScreen()));
+        } else if (title == "Department Filters") {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const DepartmentScreen()));
+        } else if (title == "Favorites") {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const FavoritesScreen()));
+        } else if (title == "Messages") {
+          Navigator.pop(context); 
+          Navigator.push(context, MaterialPageRoute(builder: (c) => const ChatInboxScreen()));
+        } else if (title == "History") {
+          Navigator.pop(context);
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const HistoryScreen()));
+        } else if (title == "Requests") {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const RequestsScreen()));
+        } else if (title == "Reports") { // FIXED: Now exactly matches the button name!
+          Navigator.pop(context); 
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const ReportsScreen()));
+        } else {
+          Navigator.pop(context); 
+        }
+      },
     );
   }
 }

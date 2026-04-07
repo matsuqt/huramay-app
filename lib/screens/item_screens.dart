@@ -26,30 +26,7 @@ class _DepartmentScreenState extends State<DepartmentScreen> {
   final TextEditingController _searchCtrl = TextEditingController(); 
   
   final List<String> _lnuDepartments = [
-    'Bachelor of Elementary Education', 
-    'Bachelor of Early Childhood Education', 
-    'Bachelor of Special Needs Education', 
-    'Bachelor of Technology and Livelihood Education', 
-    'Bachelor of Physical Education', 
-    'Bachelor of Secondary Education major in English', 
-    'Bachelor of Secondary Education major in Filipino', 
-    'Bachelor of Secondary Education major in Mathematics', 
-    'Bachelor of Secondary Education major in Science', 
-    'Bachelor of Secondary Education major in Social Studies', 
-    'Bachelor of Secondary Education major in Values Education', 
-    'Teacher Certificate Program (TCP)', 
-    'Bachelor of Library and Information Science', 
-    'Bachelor of Arts in Communication', 
-    'Bachelor of Music in Music Education', 
-    'Bachelor of Science in Information Technology', 
-    'Bachelor of Arts in English Language', 
-    'Bachelor of Arts in Political Science', 
-    'Bachelor of Science in Biology', 
-    'Bachelor of Science in Social Work', 
-    'Bachelor of Science in Tourism Management', 
-    'Bachelor of Science in Hospitality Management', 
-    'Bachelor of Science in Entrepreneurship', 
-    'Faculty / Staff'
+    'Bachelor of Elementary Education', 'Bachelor of Early Childhood Education', 'Bachelor of Special Needs Education', 'Bachelor of Technology and Livelihood Education', 'Bachelor of Physical Education', 'Bachelor of Secondary Education major in English', 'Bachelor of Secondary Education major in Filipino', 'Bachelor of Secondary Education major in Mathematics', 'Bachelor of Secondary Education major in Science', 'Bachelor of Secondary Education major in Social Studies', 'Bachelor of Secondary Education major in Values Education', 'Teacher Certificate Program (TCP)', 'Bachelor of Library and Information Science', 'Bachelor of Arts in Communication', 'Bachelor of Music in Music Education', 'Bachelor of Science in Information Technology', 'Bachelor of Arts in English Language', 'Bachelor of Arts in Political Science', 'Bachelor of Science in Biology', 'Bachelor of Science in Social Work', 'Bachelor of Science in Tourism Management', 'Bachelor of Science in Hospitality Management', 'Bachelor of Science in Entrepreneurship', 'Faculty / Staff'
   ];
 
   @override
@@ -62,7 +39,7 @@ class _DepartmentScreenState extends State<DepartmentScreen> {
   Future<void> _fetchDepartmentItems() async {
     setState(() => isLoading = true);
     try {
-      String url = 'http://10.33.87.39/api/items';
+      String url = 'http://10.174.134.39:5000/api/items';
       List<String> queryParams = [];
       
       if (_selectedDeptFilter != null) {
@@ -108,8 +85,9 @@ class _DepartmentScreenState extends State<DepartmentScreen> {
             onChanged: (value) => _fetchDepartmentItems(), 
             decoration: const InputDecoration(
               hintText: "Search",
-              prefixIcon: Icon(Icons.search),
+              prefixIcon: Icon(Icons.search, color:Colors.black),
               border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(vertical: 8),
             ),
           ),
         ),
@@ -142,7 +120,7 @@ class _DepartmentScreenState extends State<DepartmentScreen> {
                 ),
                 Row(
                   children: [
-                    const Text("Filters ", style: TextStyle(fontSize: 12, color: Colors.black54)),
+                    const Text("Filters ", style: TextStyle(fontSize: 12, color: Color.fromARGB(255, 0, 0, 0))),
                     Container(
                       height: 35,
                       padding: const EdgeInsets.symmetric(horizontal: 5),
@@ -171,23 +149,31 @@ class _DepartmentScreenState extends State<DepartmentScreen> {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20).copyWith(bottom: 10),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                isExpanded: true,
-                value: _selectedDeptFilter,
-                icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF1A0088)),
-                style: const TextStyle(
-                  color: Color(0xFF1A0088),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 15),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F4F6),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.black12)
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  isExpanded: true,
+                  value: _selectedDeptFilter,
+                  icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF1A0088)),
+                  style: const TextStyle(
+                    color: Color(0xFF1A0088),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                  onChanged: (String? newValue) {
+                    setState(() => _selectedDeptFilter = newValue);
+                    _fetchDepartmentItems();
+                  },
+                  items: _lnuDepartments.map<DropdownMenuItem<String>>((String value) {
+                    return DropdownMenuItem<String>(value: value, child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis));
+                  }).toList(),
                 ),
-                onChanged: (String? newValue) {
-                  setState(() => _selectedDeptFilter = newValue);
-                  _fetchDepartmentItems();
-                },
-                items: _lnuDepartments.map<DropdownMenuItem<String>>((String value) {
-                  return DropdownMenuItem<String>(value: value, child: Text(value));
-                }).toList(),
               ),
             ),
           ),
@@ -199,14 +185,14 @@ class _DepartmentScreenState extends State<DepartmentScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: const [
-                          Icon(Icons.block, size: 80, color: Colors.black87),
+                          Icon(Icons.inventory_2_outlined, size: 80, color:Colors.black),
                           SizedBox(height: 10),
                           Text(
-                            "No\nItems\nFound",
+                            "No Items Found",
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Colors.red,
-                              fontSize: 32,
+                              color:Colors.black,
+                              fontSize: 24,
                               fontWeight: FontWeight.bold,
                               height: 1.2,
                             ),
@@ -215,6 +201,7 @@ class _DepartmentScreenState extends State<DepartmentScreen> {
                       ),
                     )
                   : ListView.builder(
+                      physics: const BouncingScrollPhysics(),
                       itemCount: items.length,
                       itemBuilder: (c, i) => _DeptItemCard(item: items[i]),
                     ),
@@ -225,6 +212,7 @@ class _DepartmentScreenState extends State<DepartmentScreen> {
   }
 }
 
+// Modernized Department Card (Clickable Entirely)
 class _DeptItemCard extends StatelessWidget {
   final dynamic item;
   const _DeptItemCard({required this.item});
@@ -233,119 +221,80 @@ class _DeptItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     String? imgPath = item['image']; 
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
+    bool isAvailable = item['status']?.toString().toLowerCase() == 'available';
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 120,
-            height: 140,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: const Color(0xFF1A0088), width: 3),
-              image: hasImage 
-                ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) 
-                : null,
-            ),
-            child: !hasImage ? const Icon(Icons.image, size: 40, color: Colors.grey) : null,
-          ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(15),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(context, MaterialPageRoute(builder: (c) => DetailedItemScreen(item: item)));
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: Colors.black12),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 5, offset: const Offset(0, 3))],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 90,
+              height: 90,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  )
-                ],
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF1A0088), width: 1.5),
+                image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
               ),
+              child: !hasImage ? const Icon(Icons.image, size: 35, color:Colors.black) : null,
+            ),
+            const SizedBox(width: 15),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item['owner'],
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A0088),
-                      fontSize: 13,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item['owner'],
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A0088), fontSize: 13),
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isAvailable ? Colors.green.shade50 : Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: isAvailable ? Colors.green : Colors.red, width: 0.5),
+                        ),
+                        child: Text(
+                          item['status'],
+                          style: TextStyle(color: isAvailable ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 10),
+                        ),
+                      )
+                    ],
                   ),
+                  const SizedBox(height: 4),
                   Text(
                     item['title'],
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87),
+                    maxLines: 2, overflow: TextOverflow.ellipsis,
                   ),
+                  const SizedBox(height: 6),
                   Text(
                     item['dept'],
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  Text(
-                    item['status'],
-                    style: const TextStyle(
-                      color: Color(0xFF1A0088),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  Row(
-                    children: [
-                      _figmaCardBtn(context, "Read", Colors.yellow, () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (c) => DetailedItemScreen(item: item)),
-                        );
-                      }), 
-                      const SizedBox(width: 10), 
-                      _figmaCardBtn(context, "Borrow", Colors.yellow, () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (c) => DetailedItemScreen(item: item)),
-                        );
-                      }),
-                    ],
+                    style: const TextStyle(fontSize: 11, color: Color.fromARGB(255, 0, 0, 0), fontWeight: FontWeight.w600),
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _figmaCardBtn(BuildContext context, String t, Color c, Function() action) {
-    return GestureDetector(
-      onTap: action,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-        decoration: BoxDecoration(
-          color: c,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.black87, width: 1),
-        ),
-        child: Text(
-          t,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
+          ],
         ),
       ),
     );
@@ -372,7 +321,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Future<void> _fetchFavorites() async {
     setState(() => isLoading = true);
     try {
-      final res = await http.get(Uri.parse('http://10.33.87.39:5000/api/favorites/${currentUser!['id']}'));
+      final res = await http.get(Uri.parse('http://10.174.134.39:5000/api/favorites/${currentUser!['id']}'));
       if (res.statusCode == 200) {
         setState(() {
           items = jsonDecode(res.body);
@@ -388,7 +337,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Future<void> _unfavorite(int itemId) async {
     try {
       await http.post(
-        Uri.parse('http://10.33.87.39:5000/api/favorites/toggle'),
+        Uri.parse('http://10.174.134.39:5000/api/favorites/toggle'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': currentUser!['id'], 'item_id': itemId}),
       );
@@ -430,14 +379,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: const [
-                          Icon(Icons.favorite_border, size: 80, color: Colors.grey),
+                          Icon(Icons.favorite_border, size: 80, color:Colors.black),
                           SizedBox(height: 10),
                           Text(
-                            "No\nSaved\nItems",
+                            "No Saved Items",
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Colors.red,
-                              fontSize: 32,
+                              color:Colors.black,
+                              fontSize: 24,
                               fontWeight: FontWeight.bold,
                               height: 1.2,
                             ),
@@ -446,6 +395,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       ),
                     )
                   : ListView.builder(
+                      physics: const BouncingScrollPhysics(),
                       itemCount: items.length,
                       itemBuilder: (c, i) => _FavoriteCard(
                         item: items[i],
@@ -459,6 +409,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 }
 
+// Modernized Favorites Card
 class _FavoriteCard extends StatelessWidget {
   final dynamic item;
   final VoidCallback onRemoveTap;
@@ -468,92 +419,79 @@ class _FavoriteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     String? imgPath = item['image'];
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 120,
-            height: 140,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: const Color(0xFF1A0088), width: 3),
-              image: hasImage 
-                ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) 
-                : null,
-            ),
-            child: !hasImage ? const Icon(Icons.image, size: 40, color: Colors.grey) : null,
-          ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(15),
+    bool isAvailable = item['status']?.toString().toLowerCase() == 'available';
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(context, MaterialPageRoute(builder: (c) => DetailedItemScreen(item: item)));
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: Colors.black12),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 5, offset: const Offset(0, 3))],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 90,
+              height: 90,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  )
-                ],
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF1A0088), width: 1.5),
+                image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
               ),
+              child: !hasImage ? const Icon(Icons.image, size: 35, color:Colors.black) : null,
+            ),
+            const SizedBox(width: 15),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item['owner'],
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A0088),
-                      fontSize: 13,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item['owner'],
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A0088), fontSize: 13),
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: onRemoveTap,
+                        child: const Icon(Icons.favorite, color: Colors.red, size: 22),
+                      )
+                    ],
                   ),
+                  const SizedBox(height: 4),
                   Text(
                     item['title'],
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87),
+                    maxLines: 2, overflow: TextOverflow.ellipsis,
                   ),
-                  Text(
-                    item['dept'],
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
+                  const SizedBox(height: 6),
                   Text(
                     item['status'],
-                    style: const TextStyle(
-                      color: Color(0xFF1A0088),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  Center(
-                    child: GestureDetector(
-                      onTap: onRemoveTap,
-                      child: const Icon(Icons.favorite, color: Colors.red, size: 35),
-                    ),
+                    style: TextStyle(color: isAvailable ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 12),
                   ),
                 ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
 // ==================== DETAILED ITEM SCREEN ====================
+// (This screen remained exactly as you had it, unchanged functionality)
 class DetailedItemScreen extends StatefulWidget {
   final dynamic item;
   const DetailedItemScreen({super.key, required this.item});
@@ -574,7 +512,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
   Future<void> _checkIfFavorited() async {
     try {
       final res = await http.post(
-        Uri.parse('http://10.33.87.39:5000/api/favorites/check'),
+        Uri.parse('http://10.174.134.39:5000/api/favorites/check'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': currentUser!['id'], 'item_id': widget.item['id']}),
       );
@@ -589,7 +527,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
   Future<void> _toggleFavorite() async {
     try {
       final res = await http.post(
-        Uri.parse('http://10.33.87.39:5000/api/favorites/toggle'),
+        Uri.parse('http://10.174.134.39:5000/api/favorites/toggle'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': currentUser!['id'], 'item_id': widget.item['id']}),
       );
@@ -615,7 +553,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
           margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.grey[400],
+            color:Colors.grey[400],
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: Colors.black),
           ),
@@ -645,7 +583,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
                       ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) 
                       : null,
                   ),
-                  child: !hasImage ? const Icon(Icons.image, size: 50, color: Colors.grey) : null,
+                  child: !hasImage ? const Icon(Icons.image, size: 50, color:Colors.black) : null,
                 ),
                 const SizedBox(height: 25),
                 _detailLabel("Owner"),
@@ -742,7 +680,7 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
   Future<void> _fetchMyItems() async {
     setState(() => isLoading = true);
     try {
-      final res = await http.get(Uri.parse('http://10.33.87.39:5000/api/items/user/${currentUser!['id']}'));
+      final res = await http.get(Uri.parse('http://10.174.134.39:5000/api/items/user/${currentUser!['id']}'));
       if (res.statusCode == 200) {
         setState(() {
           items = jsonDecode(res.body);
@@ -757,7 +695,7 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
 
   Future<void> _deleteItem(int id) async {
     try {
-      await http.delete(Uri.parse('http://10.33.87.39:5000/api/items/$id'));
+      await http.delete(Uri.parse('http://10.174.134.39:5000/api/items/$id'));
       _fetchMyItems();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Delete failed")));
@@ -777,8 +715,9 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
           child: const TextField(
             decoration: InputDecoration(
               hintText: "Search",
-              prefixIcon: Icon(Icons.search),
+              prefixIcon: Icon(Icons.search, color:Colors.black),
               border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(vertical: 8),
             ),
           ),
         ),
@@ -815,14 +754,14 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: const [
-                            Icon(Icons.block, size: 80, color: Colors.black87),
+                            Icon(Icons.inventory_2_outlined, size: 80, color:Colors.black),
                             SizedBox(height: 10),
                             Text(
-                              "No\nItems\nFound",
+                              "No Items Yet",
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: Colors.red,
-                                fontSize: 32,
+                                color:Colors.black,
+                                fontSize: 24,
                                 fontWeight: FontWeight.bold,
                                 height: 1.2,
                               ),
@@ -831,6 +770,8 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
                         ),
                       )
                     : ListView.builder(
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.only(bottom: 80), // Padding for FAB
                         itemCount: items.length,
                         itemBuilder: (c, i) => _MyItemCard(
                           item: items[i],
@@ -840,14 +781,15 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
                               context,
                               MaterialPageRoute(builder: (c) => EditItemScreen(item: items[i])),
                             );
-                            _fetchMyItems();
+                            _fetchMyItems(); // Same exact routing logic!
                           },
                         ),
                       ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      // Modern FAB implementation
+      floatingActionButton: FloatingActionButton(
         onPressed: () async {
           await Navigator.push(
             context,
@@ -855,17 +797,17 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
           );
           _fetchMyItems();
         },
-        backgroundColor: const Color(0xFFFDEB00),
-        label: const Text(
-          "Add Item",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-        ),
+        backgroundColor: const Color(0xFF1A0088),
+        foregroundColor: Colors.white,
+        elevation: 4,
+        child: const Icon(Icons.add, size: 30),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 }
 
+// Modernized My Items Card with sleek action buttons
 class _MyItemCard extends StatefulWidget {
   final dynamic item;
   final VoidCallback onDeleteConfirm;
@@ -884,129 +826,138 @@ class _MyItemCardState extends State<_MyItemCard> {
   Widget build(BuildContext context) {
     String? imgPath = widget.item['image'];
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
+    bool isAvailable = widget.item['status']?.toString().toLowerCase() == 'available';
 
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF3F4F6),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: Colors.black12),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 5, offset: const Offset(0, 3))],
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 120,
-                height: 140,
+                width: 90,
+                height: 90,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: const Color(0xFF1A0088), width: 3),
-                  image: hasImage 
-                    ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) 
-                    : null,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF1A0088), width: 1.5),
+                  image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
                 ),
-                child: !hasImage ? const Icon(Icons.image, size: 40, color: Colors.grey) : null,
+                child: !hasImage ? const Icon(Icons.image, size: 35, color:Colors.black) : null,
               ),
               const SizedBox(width: 15),
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(15),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      )
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.item['owner'],
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A0088), fontSize: 13),
-                      ),
-                      Text(
-                        widget.item['title'],
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
-                      ),
-                      Text(
-                        widget.item['dept'],
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
-                      ),
-                      Text(
-                        widget.item['status'],
-                        style: const TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      const SizedBox(height: 15),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.item['title'],
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87),
+                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isAvailable ? Colors.green.shade50 : Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: isAvailable ? Colors.green : Colors.red, width: 0.5),
+                          ),
+                          child: Text(
+                            widget.item['status'],
+                            style: TextStyle(color: isAvailable ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 10),
+                          ),
+                        )
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      widget.item['dept'],
+                      style: const TextStyle(fontSize: 11, color: Color.fromARGB(251, 0, 0, 0), fontWeight: FontWeight.w600),
+                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // The modernized action row: Sleek text/icon buttons instead of yellow pills!
+                    if (!_showConfirm)
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          _figmaCardBtn("Delete", Colors.yellow, () => setState(() => _showConfirm = !_showConfirm)),
+                          TextButton.icon(
+                            onPressed: widget.onUpdateTap, // UNTOUCHED ROUTING LOGIC
+                            icon: const Icon(Icons.edit_outlined, size: 16),
+                            label: const Text("Edit", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            style: TextButton.styleFrom(foregroundColor: Colors.blue, padding: EdgeInsets.zero, minimumSize: const Size(50, 30)),
+                          ),
                           const SizedBox(width: 10),
-                          _figmaCardBtn("Update", Colors.yellow, widget.onUpdateTap),
+                          TextButton.icon(
+                            onPressed: () => setState(() => _showConfirm = true), // UNTOUCHED STATE LOGIC
+                            icon: const Icon(Icons.delete_outline, size: 16),
+                            label: const Text("Delete", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            style: TextButton.styleFrom(foregroundColor: Colors.red, padding: EdgeInsets.zero, minimumSize: const Size(50, 30)),
+                          ),
                         ],
                       )
-                    ],
-                  ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
+        
+        // Modernized inline delete confirmation!
         if (_showConfirm)
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20).copyWith(bottom: 10),
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
             decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: Colors.grey[400]!),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                )
-              ],
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.red.shade200),
             ),
-            child: Column(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  "Are you sure you want to delete?",
-                  style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 16),
+                  "Delete this item?",
+                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13),
                 ),
-                const SizedBox(height: 15),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _figmaCardBtn("Yes", Colors.yellow, widget.onDeleteConfirm),
-                    const SizedBox(width: 20),
-                    _figmaCardBtn("No", Colors.yellow, () => setState(() => _showConfirm = false)),
+                    TextButton(
+                      onPressed: () => setState(() => _showConfirm = false),
+                      style: TextButton.styleFrom(foregroundColor:Colors.black, minimumSize: const Size(40, 30)),
+                      child: const Text("Cancel"),
+                    ),
+                    ElevatedButton(
+                      onPressed: widget.onDeleteConfirm, // UNTOUCHED DELETE LOGIC
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        minimumSize: const Size(60, 30),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Text("Confirm"),
+                    )
                   ],
                 )
               ],
             ),
           )
       ],
-    );
-  }
-
-  Widget _figmaCardBtn(String t, Color c, Function() action) {
-    return GestureDetector(
-      onTap: action,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-        decoration: BoxDecoration(
-          color: c,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.black87, width: 1),
-        ),
-        child: Text(
-          t,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black),
-        ),
-      ),
     );
   }
 }
@@ -1056,7 +1007,7 @@ class _EditItemScreenState extends State<EditItemScreen> {
     setState(() => _isUpdating = true);
     try {
       await http.put(
-        Uri.parse('http://10.33.87.39:5000/api/items/${widget.item['id']}'),
+        Uri.parse('http://10.174.134.39:5000/api/items/${widget.item['id']}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'title': _titleCtrl.text,
@@ -1084,7 +1035,7 @@ class _EditItemScreenState extends State<EditItemScreen> {
           margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.grey[400],
+            color:Colors.grey[400],
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: Colors.black),
           ),
@@ -1221,7 +1172,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
     setState(() => _isPosting = true);
     try {
       final res = await http.post(
-        Uri.parse('http://10.33.87.39:5000/api/items'),
+        Uri.parse('http://10.174.134.39:5000/api/items'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'title': _titleCtrl.text,
@@ -1361,7 +1312,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
       filled: true,
       fillColor: Colors.white,
       hintText: hint,
-      hintStyle: const TextStyle(color: Colors.grey),
+      hintStyle: const TextStyle(color:Colors.black),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(15),

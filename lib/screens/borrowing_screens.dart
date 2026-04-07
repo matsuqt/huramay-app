@@ -11,7 +11,7 @@ import 'auth_screens.dart';
 import 'chat_screens.dart';
 import 'dashboard_screen.dart';
 
-// ==================== REQUESTS SCREEN (VAVT-48) ====================
+// ==================== REQUESTS SCREEN ====================
 class RequestsScreen extends StatefulWidget {
   const RequestsScreen({super.key});
 
@@ -32,9 +32,8 @@ class _RequestsScreenState extends State<RequestsScreen> {
   Future<void> _fetchRequests() async {
     setState(() => isLoading = true);
     try {
-      // PRO FIX: Using baseUrl for reliability
       final res = await http.get(
-        Uri.parse('http://10.33.87.39:5000/api/borrow/requests/owner/${currentUser!['id']}'),
+        Uri.parse('http://10.174.134.39:5000/api/borrow/requests/owner/${currentUser!['id']}'),
       );
       if (res.statusCode == 200) {
         setState(() {
@@ -64,8 +63,9 @@ class _RequestsScreenState extends State<RequestsScreen> {
           child: const TextField(
             decoration: InputDecoration(
               hintText: "Search",
-              prefixIcon: Icon(Icons.search),
+              prefixIcon: Icon(Icons.search, color: Colors.grey),
               border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(vertical: 8),
             ),
           ),
         ),
@@ -79,14 +79,14 @@ class _RequestsScreenState extends State<RequestsScreen> {
           )
         ],
       ),
-      drawer: const AppSidebar(),
+      drawer: const AppSidebar(), // Keeping your side menu intact
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Padding(
             padding: EdgeInsets.all(20),
             child: Text(
-              "Request",
+              "Requests",
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
@@ -101,7 +101,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
                   ? const Center(
                       child: Text(
                         "No Pending Requests",
-                        style: TextStyle(fontSize: 20, color: Colors.grey),
+                        style: TextStyle(fontSize: 18, color: Colors.grey, fontWeight: FontWeight.bold),
                       ),
                     )
                   : ListView.builder(
@@ -140,7 +140,7 @@ class _RequestCardState extends State<_RequestCard> {
   Future<void> _updateStatus(String newStatus) async {
     try {
       final res = await http.put(
-        Uri.parse('http://10.33.87.39:5000/api/borrow/request/${widget.requestData['id']}'),
+        Uri.parse('http://10.174.134.39:5000/api/borrow/request/${widget.requestData['id']}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'status': newStatus}),
       );
@@ -173,16 +173,47 @@ class _RequestCardState extends State<_RequestCard> {
     );
   }
 
+  // NEW: A confirmation pop-up so lenders don't accidentally click "Returned" early
+  void _confirmReturn() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text("Item Returned?", style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold)),
+        content: const Text("Are you sure you have received the item back from the borrower? \n\nThis will make the item available on the feed again and allow the borrower to leave a review."),
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.grey, 
+              side: const BorderSide(color: Colors.grey),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+            ),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _updateStatus('Returned');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green, 
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+            ),
+            child: const Text("Confirm"),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     dynamic item = widget.requestData['item'];
     String? imgPath = item['image'];
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
-    
-    Color acceptColor = currentStatus == 'Accepted' ? Colors.green : Colors.yellow;
-    Color declineColor = currentStatus == 'Declined' ? Colors.red : Colors.yellow;
-    String acceptText = currentStatus == 'Accepted' ? "Accepted" : "Accept";
-    String declineText = currentStatus == 'Declined' ? "Declined" : "Decline";
 
     return GestureDetector(
       onTap: _showDetailOverlay,
@@ -197,7 +228,7 @@ class _RequestCardState extends State<_RequestCard> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: const Color(0xFF1A0088), width: 3),
+                border: Border.all(color: const Color(0xFF1A0088), width: 2), 
                 image: hasImage 
                   ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) 
                   : null,
@@ -209,11 +240,12 @@ class _RequestCardState extends State<_RequestCard> {
               child: Container(
                 padding: const EdgeInsets.all(15),
                 decoration: BoxDecoration(
-                  color: Colors.grey[300],
+                  color: const Color(0xFFF3F4F6), 
                   borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: Colors.black12),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withOpacity(0.05),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     )
@@ -232,36 +264,99 @@ class _RequestCardState extends State<_RequestCard> {
                     ),
                     Text(
                       "${widget.requestData['start_date']} - ${widget.requestData['end_date']}",
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54),
                     ),
-                    const Text(
-                      "Borrowing",
-                      style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 13),
+                    const SizedBox(height: 5),
+                    Text(
+                      currentStatus,
+                      style: TextStyle(
+                        color: currentStatus == 'Pending' ? Colors.orange : (currentStatus == 'Accepted' ? Colors.green : (currentStatus == 'Returned' ? Colors.blue : Colors.red)), 
+                        fontWeight: FontWeight.bold, 
+                        fontSize: 13
+                      ),
                     ),
                     const SizedBox(height: 15),
-                    Row(
-                      children: [
-                        if (currentStatus == 'Pending') ...[
-                          _actionBtn(acceptText, acceptColor, () => _updateStatus('Accepted')),
-                          const SizedBox(width: 10),
-                          _actionBtn(declineText, declineColor, () => _updateStatus('Declined')),
-                        ],
-                        if (currentStatus == 'Accepted')
-                          _actionBtn("Message", Colors.blue, () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (c) => ChatRoomScreen(
-                                  chatRoomId: widget.requestData['id'],
-                                  otherId: widget.requestData['borrower_id'], 
-                                  otherName: widget.requestData['full_name'],
-                                  itemName: item['title'],
-                                ),
+                    
+                    // Action buttons based on status
+                    if (currentStatus == 'Pending') 
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () => _updateStatus('Accepted'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1A0088), 
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: EdgeInsets.zero,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                               ),
-                            );
-                          }),
-                      ],
-                    )
+                              child: const Text("Accept", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => _updateStatus('Declined'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.red,
+                                side: const BorderSide(color: Colors.red, width: 1.5), 
+                                padding: EdgeInsets.zero,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              ),
+                              child: const Text("Decline", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                    // NEW: Split row for "Message" and "Mark as Returned"
+                    if (currentStatus == 'Accepted')
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (c) => ChatRoomScreen(
+                                      chatRoomId: widget.requestData['id'],
+                                      otherId: widget.requestData['borrower_id'], 
+                                      otherName: widget.requestData['full_name'],
+                                      itemName: item['title'],
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.chat_bubble_outline, size: 14),
+                              label: const Text("Message", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: EdgeInsets.zero,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _confirmReturn, // Calls the confirmation popup
+                              icon: const Icon(Icons.check_circle_outline, size: 14),
+                              label: const Text("Returned", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green, // Visual indicator of success/completion
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: EdgeInsets.zero,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -271,27 +366,9 @@ class _RequestCardState extends State<_RequestCard> {
       ),
     );
   }
-
-  Widget _actionBtn(String t, Color c, Function() action) {
-    return GestureDetector(
-      onTap: action,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-        decoration: BoxDecoration(
-          color: c,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.black87, width: 1),
-        ),
-        child: Text(
-          t,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black),
-        ),
-      ),
-    );
-  }
 }
 
-// ==================== REQUEST DETAIL DIALOG ====================
+// ==================== REQUEST DETAIL DIALOG (Modernized) ====================
 class RequestDetailDialog extends StatelessWidget {
   final dynamic requestData;
   final String currentStatus;
@@ -319,9 +396,11 @@ class RequestDetailDialog extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.grey[400],
+          color: Colors.white, 
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.black),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 5))
+          ]
         ),
         child: SingleChildScrollView(
           child: Column(
@@ -332,15 +411,18 @@ class RequestDetailDialog extends StatelessWidget {
                   onTap: () => Navigator.pop(context),
                   child: Container(
                     padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(color: Colors.yellow, shape: BoxShape.circle),
-                    child: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.black),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50, 
+                      shape: BoxShape.circle
+                    ),
+                    child: const Icon(Icons.close, size: 18, color: Color(0xFF1A0088)),
                   ),
                 ),
               ),
               const SizedBox(height: 10),
               Container(
-                width: 140,
-                height: 160,
+                width: 120,
+                height: 120,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(15),
@@ -364,41 +446,34 @@ class RequestDetailDialog extends StatelessWidget {
               _detailLabel("End Date"),
               _detailValue(requestData['end_date']),
               const SizedBox(height: 15),
-              _detailLabel("Proof of ID"),
-              const Icon(Icons.assignment_ind, size: 40, color: Colors.white),
-              const SizedBox(height: 15),
-              _detailLabel("Meetup"),
+              _detailLabel("Meetup Location"),
               _detailValue(requestData['meetup_location']),
               const SizedBox(height: 30),
               if (currentStatus == 'Pending')
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
+                    OutlinedButton(
+                      onPressed: onDecline,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        side: const BorderSide(color: Colors.red, width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        minimumSize: const Size(110, 45),
+                      ),
+                      child: const Text("Decline", style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
                     ElevatedButton(
                       onPressed: onAccept,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.yellow,
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25), 
-                          side: const BorderSide(color: Colors.black),
-                        ),
+                        backgroundColor: const Color(0xFF1A0088),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        minimumSize: const Size(110, 45),
+                        elevation: 0,
                       ),
                       child: const Text("Accept", style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
-                    const SizedBox(width: 20),
-                    ElevatedButton(
-                      onPressed: onDecline,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.yellow,
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25), 
-                          side: const BorderSide(color: Colors.black),
-                        ),
-                      ),
-                      child: const Text("Decline", style: TextStyle(fontWeight: FontWeight.bold)),
-                    )
                   ],
                 )
             ],
@@ -410,17 +485,17 @@ class RequestDetailDialog extends StatelessWidget {
 
   Widget _detailLabel(String t) => Text(
     t, 
-    style: const TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 14),
+    style: const TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 13),
   );
 
   Widget _detailValue(String v) => Text(
     v, 
     textAlign: TextAlign.center, 
-    style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 15),
+    style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 15),
   );
 }
 
-// ==================== BORROWING PIPELINE (UPDATED VAVT-65) ====================
+// ==================== BORROWING PIPELINE ====================
 class BorrowingFormScreen extends StatefulWidget {
   final dynamic item;
   const BorrowingFormScreen({super.key, required this.item});
@@ -435,7 +510,6 @@ class _BorrowingFormScreenState extends State<BorrowingFormScreen> {
   final _endCtrl = TextEditingController();
   final _proofCtrl = TextEditingController();
   
-  // TICKET VAVT-65: Locations List
   final List<String> _locations = [
     'MIS/ITSO', 'IGP Canteen', 'ORC Quadrangle', 'Bleachers', 
     'Student Center 2F', 'Alba Hall', 'Montejo Parking Lot', 
@@ -451,7 +525,6 @@ class _BorrowingFormScreenState extends State<BorrowingFormScreen> {
     super.initState();
     _nameCtrl = TextEditingController(text: currentUser?['full_name'] ?? "");
     _deptCtrl = TextEditingController(text: currentUser?['department'] ?? "");
-    // Default the dropdown to the first location
     _selectedLocation = _locations.first;
   }
 
@@ -486,7 +559,7 @@ class _BorrowingFormScreenState extends State<BorrowingFormScreen> {
       "start_date": _startCtrl.text,
       "end_date": _endCtrl.text,
       "proof_of_id_path": _proofPath,
-      "meetup_location": _selectedLocation // Using dropdown value
+      "meetup_location": _selectedLocation
     };
     Navigator.push(context, MaterialPageRoute(builder: (c) => TermsScreen(item: widget.item, borrowData: borrowData)));
   }
@@ -495,28 +568,22 @@ class _BorrowingFormScreenState extends State<BorrowingFormScreen> {
   Widget build(BuildContext context) {
     String? imgPath = widget.item['image'];
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
+    
     return Scaffold(
       backgroundColor: const Color(0xFF1A0088),
-      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent, 
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 30),
         child: Column(
           children: [
-            Align(
-              alignment: Alignment.topLeft,
-              child: GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(color: Colors.yellow, shape: BoxShape.circle),
-                  child: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.black),
-                ),
-              ),
-            ),
             const SizedBox(height: 10),
             const Text("Huramay", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
             const SizedBox(height: 5),
-            const Text("Borrowing Form", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+            const Text("Borrowing Form", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white70)),
             const SizedBox(height: 20),
             Container(
               width: 120,
@@ -535,23 +602,18 @@ class _BorrowingFormScreenState extends State<BorrowingFormScreen> {
             _yellowPillInput("Start date", _startCtrl, isReadOnly: true, onTap: () => _pickDate(_startCtrl), suffixIcon: Icons.calendar_today),
             _yellowPillInput("End date", _endCtrl, isReadOnly: true, onTap: () => _pickDate(_endCtrl), suffixIcon: Icons.calendar_today),
             _yellowPillInput("Proof of ID", _proofCtrl, isReadOnly: true, onTap: _pickProof, suffixIcon: Icons.download),
-            
-            // TICKET VAVT-65: Meetup Dropdown
             _buildLocationDropdown(),
-            
-            const SizedBox(height: 30),
+            const SizedBox(height: 35),
             ElevatedButton(
               onPressed: _proceedToTerms,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.yellow,
                 foregroundColor: Colors.black,
-                minimumSize: const Size(160, 45),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
-                  side: const BorderSide(color: Colors.black),
-                ),
+                minimumSize: const Size(200, 50),
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)), 
               ),
-              child: const Text("Continue Borrowing", textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              child: const Text("Continue Borrowing", textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             ),
             const SizedBox(height: 40)
           ],
@@ -560,13 +622,12 @@ class _BorrowingFormScreenState extends State<BorrowingFormScreen> {
     );
   }
 
-  // TICKET VAVT-65: Dropdown UI Helper
   Widget _buildLocationDropdown() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("Meetup (LNU Campus Only)", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-        const SizedBox(height: 5),
+        const Text("Meetup (LNU Campus Only)", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+        const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
@@ -579,7 +640,7 @@ class _BorrowingFormScreenState extends State<BorrowingFormScreen> {
               decoration: const InputDecoration(border: InputBorder.none),
               icon: const Icon(Icons.keyboard_arrow_down, color: Colors.black),
               style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14),
-              dropdownColor: Colors.yellow,
+              dropdownColor: Colors.yellow.shade100,
               items: _locations.map((loc) => DropdownMenuItem(value: loc, child: Text(loc))).toList(),
               onChanged: (v) => setState(() => _selectedLocation = v),
             ),
@@ -591,12 +652,12 @@ class _BorrowingFormScreenState extends State<BorrowingFormScreen> {
 
   Widget _yellowPillInput(String label, TextEditingController ctrl, {bool isReadOnly = false, VoidCallback? onTap, IconData? suffixIcon}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.only(bottom: 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-          const SizedBox(height: 5),
+          Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 8),
           TextField(
             controller: ctrl, readOnly: isReadOnly, onTap: onTap,
             style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
@@ -630,7 +691,7 @@ class _TermsScreenState extends State<TermsScreen> {
     setState(() => _isSubmitting = true);
     try {
       final res = await http.post(
-        Uri.parse('http://10.33.87.39:5000/api/borrow/request'),
+        Uri.parse('http://10.174.134.39:5000/api/borrow/request'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(widget.borrowData),
       );
@@ -646,28 +707,19 @@ class _TermsScreenState extends State<TermsScreen> {
   Widget build(BuildContext context) {
     String? imgPath = widget.item['image'];
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
+    
     return Scaffold(
       backgroundColor: const Color(0xFF1A0088),
-      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent, 
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
       body: Column(
         children: [
-          Align(
-            alignment: Alignment.topLeft,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 30),
-              child: GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(color: Colors.yellow, shape: BoxShape.circle),
-                  child: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.black),
-                ),
-              ),
-            ),
-          ),
           const Text("Huramay", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 5),
-          const Text("Terms and Condition", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+          const Text("Terms and Condition", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white70)),
           const SizedBox(height: 20),
           Container(
             width: 120, height: 140,
@@ -682,14 +734,14 @@ class _TermsScreenState extends State<TermsScreen> {
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 25).copyWith(bottom: 20),
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: Colors.grey[400], borderRadius: BorderRadius.circular(15)),
+              decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(15)),
               child: Column(
                 children: [
                   Expanded(
                     child: SingleChildScrollView(
                       child: const Text(
                         "Huramay: A Mobile-Based Peer-to-Peer Academic Resource Exchange for LNU Students \n\nI. Acceptance of Responsibility \n\nBy proceeding with this request, the borrower acknowledges and accepts full responsibility for the academic resource identified in the listing. The borrower commits to treating the item with the utmost care and ensuring it remains in the same condition as documented at the time of the handover. Any pre-existing damages must be acknowledged by both parties during the physical exchange to avoid future disputes. The borrower understands that this item is being provided as a gesture of academic support within the LNU community and must not be used for any purpose that violates university policies. \n\nII. Liability and Accountability \n\nIn the event of loss, theft, or significant damage to the borrowed resource, the borrower agrees to be held liable for the repair or replacement of the item as negotiated with the lender. While the Huramay platform facilitates the connection, the legal and moral obligation to rectify damages rests solely on the borrower. Furthermore, the borrower understands that their Trust Rating is a permanent record within the local database; failure to return the item by the specified deadline or returning a damaged item will result in a formal deduction of rating points, which may limit their future access to the platform’s resources. \n\nIII. Code of Conduct and Safety \n\nAll transactions and physical handovers must take place within the designated landmarks of the Leyte Normal University (LNU) Tacloban Campus during official operating hours to ensure the safety and transparency of both parties. This agreement strictly prohibits the exchange of monetary fees or services in return for borrowing; Huramay is a non-commercial, peer-to-peer academic exchange. Both users agree to maintain professional and respectful communication through the integrated P2P chat and to promptly report any fraudulent activity or 'no-show' behavior to the project administrators.",
-                        style: TextStyle(color: Colors.black87, fontSize: 13, height: 1.4, fontWeight: FontWeight.w600),
+                        style: TextStyle(color: Colors.black87, fontSize: 13, height: 1.5, fontWeight: FontWeight.w500),
                       ),
                     ),
                   ),
@@ -699,11 +751,15 @@ class _TermsScreenState extends State<TermsScreen> {
                     children: [
                       SizedBox(
                         height: 24, width: 24,
-                        child: Checkbox(value: _isChecked, activeColor: Colors.black, onChanged: (v) => setState(() => _isChecked = v ?? false)),
+                        child: Checkbox(
+                          value: _isChecked, 
+                          activeColor: const Color(0xFF1A0088), 
+                          onChanged: (v) => setState(() => _isChecked = v ?? false)
+                        ),
                       ),
                       const SizedBox(width: 10),
                       const Expanded(
-                        child: Text("I agree to the Huramay terms and condition.", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black87)),
+                        child: Text("I agree to the Huramay terms and conditions.", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87)),
                       )
                     ],
                   )
@@ -718,12 +774,13 @@ class _TermsScreenState extends State<TermsScreen> {
                   child: ElevatedButton(
                     onPressed: _isChecked ? _submitRequest : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _isChecked ? Colors.yellow : Colors.grey,
-                      foregroundColor: Colors.black,
-                      minimumSize: const Size(160, 45),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25), side: const BorderSide(color: Colors.black)),
+                      backgroundColor: _isChecked ? Colors.yellow : Colors.grey.shade300,
+                      foregroundColor: _isChecked ? Colors.black : Colors.grey.shade600,
+                      minimumSize: const Size(200, 50),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)), 
                     ),
-                    child: const Text("Continue Borrowing", textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    child: const Text("Continue Borrowing", textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                   ),
                 )
         ],
@@ -739,6 +796,7 @@ class BorrowSuccessScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     String? imgPath = item['image'];
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
+    
     return Scaffold(
       backgroundColor: const Color(0xFF1A0088),
       body: SafeArea(
@@ -748,7 +806,7 @@ class BorrowSuccessScreen extends StatelessWidget {
             children: [
               const Text("Huramay", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
               const SizedBox(height: 5),
-              const Text("Borrowed", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+              const Text("Borrowed", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white70)),
               const SizedBox(height: 30),
               Container(
                 width: 140, height: 160,
@@ -762,18 +820,18 @@ class BorrowSuccessScreen extends StatelessWidget {
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 40),
                 padding: const EdgeInsets.all(25),
-                decoration: BoxDecoration(color: Colors.grey[400], borderRadius: BorderRadius.circular(15)),
+                decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(15)),
                 child: Column(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(5),
-                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                      child: const Icon(Icons.check, color: Colors.grey, size: 30),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: Colors.green.shade100, shape: BoxShape.circle),
+                      child: const Icon(Icons.check, color: Colors.green, size: 35),
                     ),
-                    const SizedBox(height: 15),
-                    const Text("Successfully Borrowed this item.", textAlign: TextAlign.center, style: TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 15),
-                    const Text("Waiting for approval from the owner.", textAlign: TextAlign.center, style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)),
+                    const SizedBox(height: 20),
+                    const Text("Successfully requested this item.", textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 10),
+                    const Text("Waiting for approval from the owner.", textAlign: TextAlign.center, style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600, fontSize: 14)),
                   ],
                 ),
               ),
@@ -785,10 +843,11 @@ class BorrowSuccessScreen extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.yellow,
                   foregroundColor: Colors.black,
-                  minimumSize: const Size(200, 45),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25), side: const BorderSide(color: Colors.black)),
+                  minimumSize: const Size(200, 50),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
                 ),
-                child: const Text("Back to Dashboard", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                child: const Text("Back to Dashboard", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               )
             ],
           ),

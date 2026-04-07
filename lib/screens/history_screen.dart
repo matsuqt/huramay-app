@@ -1,3 +1,4 @@
+// lib/screens/history_screen.dart
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -29,9 +30,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (currentUser == null) return;
     setState(() => isLoading = true);
     try {
-      // FIXED: Using baseUrl for consistency across the app
       final res = await http.get(
-        Uri.parse('http://10.33.87.39:5000/api/borrow/history/${currentUser!['id']}'),
+        Uri.parse('http://10.174.134.39:5000/api/borrow/history/${currentUser!['id']}'),
       );
       if (res.statusCode == 200) {
         setState(() {
@@ -60,9 +60,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
           child: const TextField(
             decoration: InputDecoration(
-              hintText: "Search",
+              hintText: "Search history...",
               prefixIcon: Icon(Icons.search),
               border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(vertical: 8),
             ),
           ),
         ),
@@ -76,7 +77,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
           )
         ],
       ),
+      
       drawer: const AppSidebar(),
+      
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -142,329 +145,422 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 }
 
-// ---------------------------------------------------------
-// 1. THE HISTORY CARD (Fixed for Null Safety)
-// ---------------------------------------------------------
 class _HistoryCard extends StatelessWidget {
   final dynamic historyData;
   const _HistoryCard({required this.historyData});
 
   @override
   Widget build(BuildContext context) {
-    // FIXED: Guard against the entire item object being null
     dynamic item = historyData['item'] ?? {}; 
     String? imgPath = item['image'];
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
+    bool isReturned = historyData['status']?.toString().toLowerCase() == 'returned';
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 120,
-            height: 140,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: const Color(0xFF1A0088), width: 3),
-              image: hasImage
-                  ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover)
-                  : null,
-            ),
-            child: !hasImage ? const Icon(Icons.image, size: 40, color: Colors.grey) : null,
-          ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  )
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // FIXED: Added '??' guards to every Text widget
-                  Text(
-                    item['owner'] ?? "Unknown Owner",
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A0088), fontSize: 13),
-                  ),
-                  Text(
-                    item['title'] ?? "Untitled Item",
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
-                  ),
-                  Text(
-                    item['dept'] ?? "No Department",
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
-                  ),
-                  Text(
-                    historyData['status'] ?? "No Status",
-                    style: const TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                  const SizedBox(height: 15),
-                  Center(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => ReportOverlay(itemData: item),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        minimumSize: const Size(100, 35),
-                        elevation: 4,
-                      ),
-                      child: const Text("Report", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------
-// 2. THE MULTI-STEP REPORT OVERLAY DIALOG (Fixed for Null Safety)
-// ---------------------------------------------------------
-enum ReportStep { details, input }
-
-class ReportOverlay extends StatefulWidget {
-  final dynamic itemData;
-  const ReportOverlay({super.key, required this.itemData});
-
-  @override
-  State<ReportOverlay> createState() => _ReportOverlayState();
-}
-
-class _ReportOverlayState extends State<ReportOverlay> {
-  ReportStep currentStep = ReportStep.details;
-  final TextEditingController _reportTextCtrl = TextEditingController();
-  bool isSubmitting = false;
-
-  void _handleBack() {
-    if (currentStep == ReportStep.input) {
-      setState(() => currentStep = ReportStep.details);
-    } else {
-      Navigator.pop(context);
-    }
-  }
-
-  void _showConfirmation() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[300],
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15), side: const BorderSide(color: Colors.black)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
+    return GestureDetector(
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (context) => HistoryDetailOverlay(historyData: historyData),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              "Are you sure you want to report?",
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 16),
+            Container(
+              width: 120,
+              height: 140,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: const Color(0xFF1A0088), width: 2),
+                image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
+              ),
+              child: !hasImage ? const Icon(Icons.image, size: 40, color: Colors.grey) : null,
             ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _confirmBtn("Yes", () {
-                  Navigator.pop(context); 
-                  _submitReportToBackend(); 
-                }),
-                _confirmBtn("No", () {
-                  Navigator.pop(context); 
-                }),
-              ],
-            )
+            const SizedBox(width: 15),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6), 
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: Colors.black12),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item['owner'] ?? "Unknown Owner",
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A0088), fontSize: 13),
+                    ),
+                    Text(
+                      item['title'] ?? "Untitled Item",
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
+                    ),
+                    Text(
+                      item['dept'] ?? "No Department",
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      historyData['status'] ?? "No Status",
+                      style: TextStyle(
+                        color: isReturned ? Colors.green : const Color(0xFF1A0088), 
+                        fontWeight: FontWeight.bold, 
+                        fontSize: 13
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    const Text(
+                      "Tap to view details & reviews", 
+                      style: TextStyle(fontSize: 10, color: Colors.grey, fontStyle: FontStyle.italic)
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _confirmBtn(String text, VoidCallback action) {
-    return ElevatedButton(
-      onPressed: action,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.yellow,
-        foregroundColor: Colors.black,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: Colors.black)),
-      ),
-      child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold)),
-    );
+class HistoryDetailOverlay extends StatefulWidget {
+  final dynamic historyData;
+  const HistoryDetailOverlay({super.key, required this.historyData});
+
+  @override
+  State<HistoryDetailOverlay> createState() => _HistoryDetailOverlayState();
+}
+
+class _HistoryDetailOverlayState extends State<HistoryDetailOverlay> {
+  final TextEditingController _reviewTextCtrl = TextEditingController();
+  
+  bool isSubmitting = false;
+  bool _showReviewForm = false; 
+  int _rating = 5; 
+
+  List<dynamic> _realReviews = [];
+  bool _isLoadingReviews = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchItemReviews();
   }
 
-  Future<void> _submitReportToBackend() async {
+  Future<void> _fetchItemReviews() async {
+    try {
+      int itemId = widget.historyData['item']['id'];
+      final res = await http.get(Uri.parse('http://10.174.134.39:5000/api/reviews/item/$itemId'));
+
+      if (res.statusCode == 200) {
+        if (mounted) {
+          setState(() {
+            _realReviews = jsonDecode(res.body);
+            _isLoadingReviews = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Fetch reviews error: $e");
+      if (mounted) setState(() => _isLoadingReviews = false);
+    }
+  }
+
+  Future<void> _submitReviewToBackend() async {
+    if (_reviewTextCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please write a review first.")));
+      return;
+    }
+
     setState(() => isSubmitting = true);
     try {
       final res = await http.post(
-        Uri.parse('http://10.33.87.39:5000/api/report'),
+        Uri.parse('http://10.174.134.39:5000/api/review'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'reporter_id': currentUser!['id'],
-          'item_id': widget.itemData['id'],
-          'report_text': _reportTextCtrl.text.isEmpty ? "No details provided" : _reportTextCtrl.text
+          'reviewer_id': currentUser!['id'],
+          'item_id': widget.historyData['item']['id'],
+          'lender_id': widget.historyData['item']['user_id'], 
+          'rating': _rating,
+          'review_text': _reviewTextCtrl.text.trim()
         }),
       );
+      
       if (res.statusCode == 201) {
-        Navigator.pop(context); 
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Report submitted successfully.")));
+        if (mounted) {
+          setState(() {
+            _showReviewForm = false;
+            _reviewTextCtrl.clear();
+            _rating = 5;
+            _isLoadingReviews = true; 
+          });
+          _fetchItemReviews(); 
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Review submitted successfully!")));
+        }
       }
     } catch (e) {
-      debugPrint("Report Submission Error: $e");
+      debugPrint("Review Submission Error: $e");
     } finally {
-      setState(() => isSubmitting = false);
+      if (mounted) setState(() => isSubmitting = false);
     }
+  }
+
+  Widget _buildMiniStars(int rating) {
+    return Row(
+      children: List.generate(5, (index) {
+        return Icon(
+          index < rating ? Icons.star : Icons.star_border,
+          color: Colors.amber, 
+          size: 14,
+        );
+      }),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    String? imgPath = widget.itemData['image'];
+    dynamic item = widget.historyData['item'] ?? {};
+    String? imgPath = item['image'];
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
+    bool isReturned = widget.historyData['status']?.toString().toLowerCase() == 'returned';
 
     return Dialog(
       backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(20),
       child: Container(
         width: double.infinity,
-        height: MediaQuery.of(context).size.height * 0.75, 
+        height: MediaQuery.of(context).size.height * 0.85, 
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFFBDBDBD), 
+          color: Colors.white, 
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.black),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 5))]
         ),
         child: Column(
           children: [
             Align(
               alignment: Alignment.topLeft,
               child: GestureDetector(
-                onTap: _handleBack,
+                onTap: () => Navigator.pop(context),
                 child: Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(color: Colors.yellow, shape: BoxShape.circle),
-                  child: const Icon(Icons.arrow_back_ios_new, size: 18, color: Colors.black),
+                  decoration: BoxDecoration(color: Colors.blue.shade50, shape: BoxShape.circle),
+                  child: const Icon(Icons.close, size: 18, color: Color(0xFF1A0088)), 
                 ),
               ),
             ),
-            const SizedBox(height: 10),
-            Container(
-              width: 140,
-              height: 160,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: const Color(0xFF1A0088), width: 3),
-                image: hasImage 
-                  ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) 
-                  : null,
-              ),
-              child: !hasImage ? const Icon(Icons.image, size: 50, color: Colors.grey) : null,
-            ),
-            const SizedBox(height: 25),
+            
             Expanded(
-              child: currentStep == ReportStep.details 
-                ? _buildDetailsView() 
-                : _buildInputView(),
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 100, height: 100,
+                      decoration: BoxDecoration(
+                        color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFF1A0088), width: 3),
+                        image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
+                      ),
+                      child: !hasImage ? const Icon(Icons.image, size: 40, color: Colors.grey) : null,
+                    ),
+                    const SizedBox(height: 15),
+
+                    Text(item['title'] ?? "Untitled", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black)),
+                    Text("Owned by: ${item['owner']}", style: const TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 14)),
+                    const SizedBox(height: 10),
+                    
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(10)),
+                      child: Column(
+                        children: [
+                          _detailRow("Borrow Date:", widget.historyData['start_date'] ?? "N/A"),
+                          const SizedBox(height: 5),
+                          _detailRow("Return Date:", widget.historyData['end_date'] ?? "N/A"),
+                          const SizedBox(height: 5),
+                          _detailRow("Status:", widget.historyData['status'] ?? "N/A", isStatus: true),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    const Divider(color: Colors.black12, thickness: 1),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Item Reviews", style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 16)),
+                        
+                        if (isReturned && !_showReviewForm)
+                          ElevatedButton.icon(
+                            onPressed: () => setState(() => _showReviewForm = true),
+                            icon: const Icon(Icons.rate_review, size: 14),
+                            label: const Text("Add Review", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.yellow,
+                              foregroundColor: Colors.black,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                              minimumSize: const Size(0, 30)
+                            ),
+                          )
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    if (_showReviewForm) ...[
+                      Container(
+                        padding: const EdgeInsets.all(15),
+                        margin: const EdgeInsets.only(bottom: 15),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(color: const Color(0xFF1A0088), width: 1.5)
+                        ),
+                        child: Column(
+                          children: [
+                            const Text("Rate your experience", style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 14)),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(5, (index) {
+                                return IconButton(
+                                  icon: Icon(index < _rating ? Icons.star : Icons.star_border, color: Colors.amber, size: 30),
+                                  onPressed: () => setState(() => _rating = index + 1),
+                                );
+                              }),
+                            ),
+                            Container(
+                              decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.black12)),
+                              child: TextField(
+                                controller: _reviewTextCtrl,
+                                maxLines: 2,
+                                decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.all(10), hintText: "Write your review...", hintStyle: TextStyle(color: Colors.black38, fontSize: 12)),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () => setState(() => _showReviewForm = false),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: Colors.red,
+                                      side: const BorderSide(color: Colors.red),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                    ),
+                                    child: const Text("Cancel"),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: isSubmitting 
+                                    ? const Center(child: CircularProgressIndicator())
+                                    : ElevatedButton(
+                                        onPressed: _submitReviewToBackend,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF1A0088),
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                        ),
+                                        child: const Text("Submit"),
+                                      ),
+                                ),
+                              ],
+                            )
+                          ],
+                        ),
+                      )
+                    ],
+
+                    _isLoadingReviews
+                      ? const Padding(
+                          padding: EdgeInsets.all(20),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      : _realReviews.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 20),
+                              child: Text("No reviews yet. Be the first to share your experience!", style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
+                            )
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(), 
+                              itemCount: _realReviews.length,
+                              itemBuilder: (context, index) {
+                                final review = _realReviews[index];
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    border: Border.all(color: Colors.black12),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 16,
+                                        backgroundColor: const Color(0xFF1A0088),
+                                        child: Text(
+                                          review['reviewer_name'].isNotEmpty ? review['reviewer_name'][0].toUpperCase() : '?', 
+                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              children: [
+                                                Text(review['reviewer_name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                                Text(review['date'], style: const TextStyle(color: Colors.black54, fontSize: 10)),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 2),
+                                            _buildMiniStars(review['rating']),
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              review['comment'],
+                                              style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.3),
+                                            )
+                                          ],
+                                        ),
+                                      )
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                  ],
+                ),
+              ),
             ),
-            isSubmitting 
-              ? const CircularProgressIndicator()
-              : ElevatedButton(
-                  onPressed: () {
-                    if (currentStep == ReportStep.details) {
-                      setState(() => currentStep = ReportStep.input);
-                    } else {
-                      _showConfirmation();
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: const BorderSide(color: Colors.black)),
-                    minimumSize: const Size(120, 45),
-                    elevation: 5,
-                  ),
-                  child: const Text("Report", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                )
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDetailsView() {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _centeredLabel("Owner"),
-          // FIXED: Guarded against null
-          _centeredValue(widget.itemData['owner'] ?? "N/A"),
-          const SizedBox(height: 10),
-          _centeredLabel("Item"),
-          _centeredValue(widget.itemData['title'] ?? "N/A"),
-          const SizedBox(height: 10),
-          _centeredLabel("Department"),
-          _centeredValue(widget.itemData['dept'] ?? "N/A"),
-          const SizedBox(height: 10),
-          _centeredLabel("Description"),
-          _centeredValue(widget.itemData['description'] ?? "No description available."),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInputView() {
-    return Column(
+  Widget _detailRow(String label, String value, {bool isStatus = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Text("Type here your report", style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 16)),
-        const SizedBox(height: 10),
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: TextField(
-              controller: _reportTextCtrl,
-              maxLines: null,
-              keyboardType: TextInputType.multiline,
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.all(15),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
+        Text(label, style: const TextStyle(fontSize: 13, color: Colors.black54, fontWeight: FontWeight.w600)),
+        Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: isStatus ? const Color(0xFF1A0088) : Colors.black87)),
       ],
     );
   }
-
-  Widget _centeredLabel(String t) => Text(
-    t, 
-    textAlign: TextAlign.center,
-    style: const TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 14),
-  );
-
-  Widget _centeredValue(String v) => Text(
-    v, 
-    textAlign: TextAlign.center, 
-    style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14),
-  );
 }
