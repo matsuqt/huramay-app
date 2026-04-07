@@ -39,7 +39,7 @@ class _DepartmentScreenState extends State<DepartmentScreen> {
   Future<void> _fetchDepartmentItems() async {
     setState(() => isLoading = true);
     try {
-      String url = 'http://10.174.134.39:5000/api/items';
+      String url = 'https://huramay-app.onrender.com/api/items';
       List<String> queryParams = [];
       
       if (_selectedDeptFilter != null) {
@@ -321,7 +321,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Future<void> _fetchFavorites() async {
     setState(() => isLoading = true);
     try {
-      final res = await http.get(Uri.parse('http://10.174.134.39:5000/api/favorites/${currentUser!['id']}'));
+      final res = await http.get(Uri.parse('https://huramay-app.onrender.com/api/favorites/${currentUser!['id']}'));
       if (res.statusCode == 200) {
         setState(() {
           items = jsonDecode(res.body);
@@ -337,7 +337,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Future<void> _unfavorite(int itemId) async {
     try {
       await http.post(
-        Uri.parse('http://10.174.134.39:5000/api/favorites/toggle'),
+        Uri.parse('https://huramay-app.onrender.com/api/favorites/toggle'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': currentUser!['id'], 'item_id': itemId}),
       );
@@ -511,7 +511,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
   Future<void> _checkIfFavorited() async {
     try {
       final res = await http.post(
-        Uri.parse('http://10.174.134.39:5000/api/favorites/check'), // USING BASE URL
+        Uri.parse('https://huramay-app.onrender.com/api/favorites/check'), // USING BASE URL
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': currentUser!['id'], 'item_id': widget.item['id']}),
       );
@@ -526,7 +526,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
   Future<void> _toggleFavorite() async {
     try {
       final res = await http.post(
-        Uri.parse('http://10.174.134.39:5000/api/favorites/toggle'), // USING BASE URL
+        Uri.parse('https://huramay-app.onrender.com/api/favorites/toggle'), // USING BASE URL
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': currentUser!['id'], 'item_id': widget.item['id']}),
       );
@@ -722,7 +722,7 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
   Future<void> _fetchMyItems() async {
     setState(() => isLoading = true);
     try {
-      final res = await http.get(Uri.parse('http://10.174.134.39:5000/api/items/user/${currentUser!['id']}'));
+      final res = await http.get(Uri.parse('https://huramay-app.onrender.com/api/items/user/${currentUser!['id']}'));
       if (res.statusCode == 200) {
         setState(() {
           items = jsonDecode(res.body);
@@ -737,7 +737,7 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
 
   Future<void> _deleteItem(int id) async {
     try {
-      await http.delete(Uri.parse('http://10.174.134.39:5000/api/items/$id'));
+      await http.delete(Uri.parse('https://huramay-app.onrender.com/api/items/$id'));
       _fetchMyItems();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Delete failed")));
@@ -1049,8 +1049,8 @@ class _EditItemScreenState extends State<EditItemScreen> {
     setState(() => _isUpdating = true);
     try {
       await http.put(
-        // FIXED: Using $baseUrl instead of the hardcoded IP
-        Uri.parse('http://10.174.134.39:5000/api/items/${widget.item['id']}'),
+        // FIXED: Using https://huramay-app.onrender.com instead of the hardcoded IP
+        Uri.parse('https://huramay-app.onrender.com/api/items/${widget.item['id']}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'title': _titleCtrl.text,
@@ -1248,8 +1248,8 @@ class _AddItemScreenState extends State<AddItemScreen> {
     setState(() => _isPosting = true);
     try {
       final res = await http.post(
-        // FIXED: Swapped hardcoded IP for $baseUrl
-        Uri.parse('http://10.174.134.39:5000/api/items'),
+        // FIXED: Swapped hardcoded IP for https://huramay-app.onrender.com
+        Uri.parse('https://huramay-app.onrender.com/api/items'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'title': _titleCtrl.text,

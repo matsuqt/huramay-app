@@ -31,8 +31,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Future<void> _fetchAllItems() async {
     setState(() => isLoading = true);
     try {
-      // FIXED: Swapped hardcoded IP for $baseUrl
-      String url = 'http://10.174.134.39:5000/api/items';
+      // FIXED: Swapped hardcoded IP for https://huramay-app.onrender.com
+      String url = 'https://huramay-app.onrender.com/api/items';
       String searchQuery = _searchCtrl.text.trim();
       if (searchQuery.isNotEmpty) {
         url += '?search=${Uri.encodeComponent(searchQuery)}';
@@ -53,7 +53,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Future<void> _executeDelete(int itemId) async {
     try {
-      final res = await http.delete(Uri.parse('http://10.174.134.39:5000/api/items/$itemId'));
+      final res = await http.delete(Uri.parse('https://huramay-app.onrender.com/api/items/$itemId'));
       if (res.statusCode == 200) {
         _fetchAllItems();
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Item Deleted permanently.")));
@@ -65,7 +65,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Future<void> _executeBan(int userId) async {
     try {
-      final res = await http.delete(Uri.parse('http://10.174.134.39:5000/api/users/$userId'));
+      final res = await http.delete(Uri.parse('https://huramay-app.onrender.com/api/users/$userId'));
       if (res.statusCode == 200) {
         _fetchAllItems();
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User Banned permanently.")));
@@ -420,7 +420,7 @@ class _AdminReportOverlayState extends State<AdminReportOverlay> {
     setState(() => isSubmitting = true);
     try {
       final res = await http.post(
-        Uri.parse('http://10.174.134.39:5000/api/report'),
+        Uri.parse('https://huramay-app.onrender.com/api/report'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'reporter_id': currentUser!['id'], 
@@ -636,7 +636,7 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
   Future<void> _fetchAdmins() async {
     setState(() => isLoading = true);
     try {
-      final res = await http.get(Uri.parse('http://10.174.134.39:5000/api/admins'));
+      final res = await http.get(Uri.parse('https://huramay-app.onrender.com/api/admins'));
       if (res.statusCode == 200) {
         setState(() => adminList = jsonDecode(res.body));
       }
@@ -654,7 +654,7 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
     }
 
     try {
-      final res = await http.delete(Uri.parse('http://10.174.134.39:5000/api/admins/$id'));
+      final res = await http.delete(Uri.parse('https://huramay-app.onrender.com/api/admins/$id'));
       if (res.statusCode == 200) {
         _fetchAdmins();
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Admin account deleted.")));
@@ -720,7 +720,7 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
                       
                       try {
                         final res = await http.post(
-                          Uri.parse('http://10.174.134.39:5000/api/admins/create'),
+                          Uri.parse('https://huramay-app.onrender.com/api/admins/create'),
                           headers: {'Content-Type': 'application/json'},
                           body: jsonEncode({
                             'full_name': _nameCtrl.text.trim(),

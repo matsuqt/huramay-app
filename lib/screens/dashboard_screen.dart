@@ -31,7 +31,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _fetchItems() async {
     setState(() => isLoading = true);
     try {
-      String url = 'http://10.174.134.39:5000/api/items';
+      String url = 'https://huramay-app.onrender.com/api/items';
       List<String> queryParams = [];
       
       if (_currentFilter != null && _currentFilter != 'All') {

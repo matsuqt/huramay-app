@@ -33,8 +33,8 @@ class _AppSidebarState extends State<AppSidebar> {
   Future<void> _fetchUnreadCount() async {
     if (currentUser == null) return;
     try {
-      // FIXED: Now uses $baseUrl so it never breaks when your Wi-Fi changes!
-      final res = await http.get(Uri.parse('$baseUrl/api/messages/unread/${currentUser!['id']}'));
+      // FIXED: Now uses https://huramay-app.onrender.com so it never breaks when your Wi-Fi changes!
+      final res = await http.get(Uri.parse('https://huramay-app.onrender.com/api/messages/unread/${currentUser!['id']}'));
       if (res.statusCode == 200) {
         if (mounted) {
           setState(() {

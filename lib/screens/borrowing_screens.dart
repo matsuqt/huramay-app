@@ -32,9 +32,9 @@ class _RequestsScreenState extends State<RequestsScreen> {
   Future<void> _fetchRequests() async {
     setState(() => isLoading = true);
     try {
-      // FIX 1: Use $baseUrl to ensure it works perfectly in Chrome and Render
+      // FIX 1: Use https://huramay-app.onrender.com to ensure it works perfectly in Chrome and Render
       final res = await http.get(
-        Uri.parse('http://10.174.134.39:5000/api/borrow/requests/owner/${currentUser!['id']}'),
+        Uri.parse('https://huramay-app.onrender.com/api/borrow/requests/owner/${currentUser!['id']}'),
       );
       
       if (res.statusCode == 200) {
@@ -143,7 +143,7 @@ class _RequestCardState extends State<_RequestCard> {
   Future<void> _updateStatus(String newStatus) async {
     try {
       final res = await http.put(
-        Uri.parse('http://10.174.134.39:5000/api/borrow/request/${widget.requestData['id']}'),
+        Uri.parse('https://huramay-app.onrender.com/api/borrow/request/${widget.requestData['id']}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'status': newStatus}),
       );
@@ -730,7 +730,7 @@ class _TermsScreenState extends State<TermsScreen> {
     setState(() => _isSubmitting = true);
     try {
       final res = await http.post(
-        Uri.parse('http://10.174.134.39:5000/api/borrow/request'), // Using $baseUrl dynamically!
+        Uri.parse('https://huramay-app.onrender.com/api/borrow/request'), // Using https://huramay-app.onrender.com dynamically!
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(widget.borrowData),
       );

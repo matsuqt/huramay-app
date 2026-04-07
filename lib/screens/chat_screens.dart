@@ -51,7 +51,7 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
   Future<void> _fetchInbox() async {
     setState(() => isLoading = true);
     try {
-      final res = await http.get(Uri.parse('$baseUrl/api/messages/inbox/${currentUser!['id']}')); // Updated to baseUrl
+      final res = await http.get(Uri.parse('https://huramay-app.onrender.com/api/messages/inbox/${currentUser!['id']}')); // Updated to baseUrl
       if (res.statusCode == 200) {
         if (mounted) setState(() { threads = jsonDecode(res.body); });
       }
@@ -236,7 +236,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   Future<void> _loadHistory() async {
     try {
-      final res = await http.get(Uri.parse('$baseUrl/api/messages/history/${widget.chatRoomId}')); // Updated to baseUrl
+      final res = await http.get(Uri.parse('https://huramay-app.onrender.com/api/messages/history/${widget.chatRoomId}')); // Updated to baseUrl
       if (res.statusCode == 200) {
         if (mounted) {
           setState(() {
@@ -256,7 +256,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Future<void> _markMessagesAsRead() async {
     try {
       await http.post(
-        Uri.parse('$baseUrl/api/messages/read'), // Updated to baseUrl
+        Uri.parse('https://huramay-app.onrender.com/api/messages/read'), // Updated to baseUrl
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'chat_room_id': widget.chatRoomId,
@@ -272,7 +272,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     _msgCtrl.clear();
     try {
       await http.post(
-        Uri.parse('$baseUrl/api/messages/send'), // Updated to baseUrl
+        Uri.parse('https://huramay-app.onrender.com/api/messages/send'), // Updated to baseUrl
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'chat_room_id': widget.chatRoomId,
