@@ -103,3 +103,30 @@ def test_submit_borrow_request(client):
     assert saved_request is not None
     assert saved_request.status == "Pending"
     assert saved_request.meetup_location == "LNU Library"
+
+def test_register_duplicate_email(client):
+    """Test that the app blocks two users from using the same email."""
+    
+    # 1. Register the first user
+    client.post('/api/register', json={
+        "full_name": "First User",
+        "email": "clone@gmail.com",
+        "department": "IT",
+        "password": "password"
+    })
+    
+    # 2. Try to register a second user with the exact same email
+    response = client.post('/api/register', json={
+        "full_name": "Copycat User",
+        "email": "clone@gmail.com",  # Same email!
+        "department": "Education",
+        "password": "password123"
+    })
+    
+    # 3. We EXPECT it to fail with a 400 status code
+    assert response.status_code == 400
+    
+    # 4. Check that your app gave the correct error message
+    import json
+    data = json.loads(response.data)
+    assert data['message'] == "Email already registered"
