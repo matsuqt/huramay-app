@@ -20,19 +20,28 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+  
+  // NEW: Added FormKey and visibility boolean
+  final _formKey = GlobalKey<FormState>();
+  bool _obscurePass = true;
 
   Future<void> doLogin() async {
+    // NEW: Trigger validators before making the HTTP request
+    if (!_formKey.currentState!.validate()) return;
+
     try {
       var res = await http.post(
         Uri.parse('https://huramay-app.onrender.com/api/login'), 
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': _emailCtrl.text, 'password': _passCtrl.text}),
       );
+      
+      if (!mounted) return; // FIX: Prevent BuildContext across async gaps warning
+
       var data = jsonDecode(res.body);
       
       if (res.statusCode == 200) {
         currentUser = data;
-        
         bool isAdmin = data['is_admin'] ?? false;
 
         if (isAdmin) {
@@ -48,6 +57,27 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // NEW: Helper method to support validators and the eye icon
+  Widget _buildValidatedInput(TextEditingController ctrl, {bool isPass = false, String? Function(String?)? validator}) {
+    return TextFormField(
+      controller: ctrl,
+      obscureText: isPass ? _obscurePass : false,
+      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+        errorStyle: const TextStyle(color: Color.fromARGB(255, 255, 0, 0), fontWeight: FontWeight.bold, fontSize: 13),
+        suffixIcon: isPass ? IconButton(
+          icon: Icon(_obscurePass ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
+          onPressed: () => setState(() => _obscurePass = !_obscurePass),
+        ) : null,
+      ),
+      validator: validator,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -57,31 +87,45 @@ class _LoginScreenState extends State<LoginScreen> {
         decoration: figmaBackground(),
         child: Padding(
           padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text("Huramay", style: TextStyle(fontSize: 45, color: Colors.white, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 40),
-              const Text("Login", style: TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 30),
-              figmaLabel("Email"),
-              figmaInputAuth(_emailCtrl),
-              figmaLabel("Password"),
-              figmaInputAuth(_passCtrl, isPass: true),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text("Don't have an account? ", style: TextStyle(color: Colors.white)),
-                  GestureDetector(
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const SignUpScreen())),
-                    child: const Text("SignUp", style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
-                  )
-                ],
-              ),
-              const SizedBox(height: 40),
-              figmaButton("Login", doLogin),
-            ],
+          child: Form( // NEW: Wrapped in Form
+            key: _formKey,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text("Huramay", style: TextStyle(fontSize: 45, color: Colors.white, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 40),
+                const Text("Login", style: TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 30),
+                
+                figmaLabel("Email"),
+                _buildValidatedInput(_emailCtrl, validator: (value) {
+                  if (value == null || value.isEmpty) return 'Please enter your email';
+                  return null;
+                }),
+                
+                const SizedBox(height: 10),
+                
+                figmaLabel("Password"),
+                _buildValidatedInput(_passCtrl, isPass: true, validator: (value) {
+                  if (value == null || value.isEmpty) return 'Please enter your password';
+                  return null;
+                }),
+                
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text("Don't have an account? ", style: TextStyle(color: Colors.white)),
+                    GestureDetector(
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const SignUpScreen())),
+                      child: const Text("SignUp", style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                    )
+                  ],
+                ),
+                const SizedBox(height: 40),
+                figmaButton("Login", doLogin),
+              ],
+            ),
           ),
         ),
       ),
@@ -102,21 +146,24 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _confCtrl = TextEditingController();
   String? _selectedDept;
   
+  // NEW: Added FormKey and visibility booleans
+  final _formKey = GlobalKey<FormState>();
+  bool _obscurePass = true;
+  bool _obscureConf = true;
+
   final List<String> _lnuDepartments = [
     'Bachelor of Elementary Education', 'Bachelor of Early Childhood Education', 'Bachelor of Special Needs Education', 'Bachelor of Technology and Livelihood Education', 'Bachelor of Physical Education', 'Bachelor of Secondary Education major in English', 'Bachelor of Secondary Education major in Filipino', 'Bachelor of Secondary Education major in Mathematics', 'Bachelor of Secondary Education major in Science', 'Bachelor of Secondary Education major in Social Studies', 'Bachelor of Secondary Education major in Values Education', 'Teacher Certificate Program (TCP)', 'Bachelor of Library and Information Science', 'Bachelor of Arts in Communication', 'Bachelor of Music in Music Education', 'Bachelor of Science in Information Technology', 'Bachelor of Arts in English Language', 'Bachelor of Arts in Political Science', 'Bachelor of Science in Biology', 'Bachelor of Science in Social Work', 'Bachelor of Science in Tourism Management', 'Bachelor of Science in Hospitality Management', 'Bachelor of Science in Entrepreneurship', 'Faculty / Staff'
   ];
 
   Future<void> doSignup() async {
-    // TICKET VAVT-64: Enforce @gmail.com extension
-    String emailInput = _emailCtrl.text.trim().toLowerCase();
-    if (!emailInput.endsWith('@gmail.com')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Not an email address extension.")),
-      );
-      return; // Stop the signup process right here
+    // NEW: Trigger validators (Regex for emojis, special chars, matching passwords)
+    if (!_formKey.currentState!.validate()) return;
+    if (_selectedDept == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a department")));
+      return;
     }
-
-    if (_selectedDept == null || _passCtrl.text != _confCtrl.text) return;
+    
+    String emailInput = _emailCtrl.text.trim().toLowerCase();
     
     try {
       var res = await http.post(
@@ -125,17 +172,38 @@ class _SignUpScreenState extends State<SignUpScreen> {
         body: jsonEncode({'full_name': _nameCtrl.text, 'email': emailInput, 'department': _selectedDept, 'password': _passCtrl.text}),
       );
       
+      if (!mounted) return; // FIX: Prevent BuildContext across async gaps warning
+
       if (res.statusCode == 201) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Account created! Please log in.")));
       } else {
-        // PRO FIX: Actually show the user why it failed (e.g. Email already exists)
         var data = jsonDecode(res.body);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'])));
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Connection Error")));
     }
+  }
+
+  // NEW: Helper method to support validators and the eye icon
+  Widget _buildValidatedInput(TextEditingController ctrl, {bool isPass = false, bool? obscure, VoidCallback? onToggle, String? Function(String?)? validator}) {
+    return TextFormField(
+      controller: ctrl,
+      obscureText: obscure ?? false,
+      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+        suffixIcon: isPass ? IconButton(
+          icon: Icon(obscure! ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
+          onPressed: onToggle,
+        ) : null,
+      ),
+      validator: validator,
+    );
   }
 
   @override
@@ -147,50 +215,81 @@ class _SignUpScreenState extends State<SignUpScreen> {
         decoration: figmaBackground(),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(40),
-          child: Column(
-            children: [
-              const SizedBox(height: 60),
-              const Text("Huramay", style: TextStyle(fontSize: 45, color: Colors.white, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              const Text("SignUp", style: TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 30),
-              figmaLabel("Full Name"),
-              figmaInputAuth(_nameCtrl),
-              figmaLabel("Email"),
-              figmaInputAuth(_emailCtrl),
-              figmaLabel("Department"),
-              Container(
-                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(20)),
-                padding: const EdgeInsets.symmetric(horizontal: 15),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    value: _selectedDept,
-                    hint: const Text("Select program", style: TextStyle(fontSize: 12)),
-                    items: _lnuDepartments.map((d) => DropdownMenuItem(value: d, child: Text(d, style: const TextStyle(fontSize: 12)))).toList(),
-                    onChanged: (v) => setState(() => _selectedDept = v),
-                    decoration: const InputDecoration(border: InputBorder.none),
+          child: Form( // NEW: Wrapped in Form
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 60),
+                const Center(child: Text("Huramay", style: TextStyle(fontSize: 45, color: Colors.white, fontWeight: FontWeight.bold))),
+                const SizedBox(height: 10),
+                const Center(child: Text("SignUp", style: TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.bold))),
+                const SizedBox(height: 30),
+                
+                // NAME VALIDATION
+                figmaLabel("Full Name"),
+                _buildValidatedInput(_nameCtrl, validator: (value) {
+                  if (value == null || value.isEmpty) return 'Please enter your name';
+                  if (!RegExp(r'^[a-zA-Z\s\.]+$').hasMatch(value)) return 'No numbers, special characters, or emoji';
+                  return null;
+                }),
+                const SizedBox(height: 10),
+
+                // EMAIL VALIDATION
+                figmaLabel("Email"),
+                _buildValidatedInput(_emailCtrl, validator: (value) {
+                  if (value == null || value.isEmpty) return 'Please enter your email';
+                  bool hasEmoji = RegExp(r'[\u00A9\u00AE\u2000-\u3300\ud83c\ud000-\ud83c\udfff\ud83d\ud000-\ud83d\udfff\ud83e\ud000-\ud83e\udfff]').hasMatch(value);
+                  bool hasSpecialChars = value.contains(RegExp(r'[!#\$%^&*() \?":{}|<>]'));
+                  if (hasEmoji || hasSpecialChars) return 'No special characters other @ or emoji allowed';
+                  if (!value.toLowerCase().endsWith('@gmail.com')) return 'Email must end with @gmail.com';
+                  return null;
+                }),
+                const SizedBox(height: 10),
+
+                // DEPARTMENT
+                figmaLabel("Department"),
+                Container(
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 3),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      value: _selectedDept,
+                      hint: const Text("Select program", style: TextStyle(fontSize: 14, color: Colors.black54)),
+                      items: _lnuDepartments.map((d) => DropdownMenuItem(value: d, child: Text(d, style: const TextStyle(fontSize: 12, color: Colors.black, fontWeight: FontWeight.bold)))).toList(),
+                      onChanged: (v) => setState(() => _selectedDept = v),
+                      decoration: const InputDecoration(border: InputBorder.none),
+                      validator: (value) => value == null ? 'Please select a department' : null,
+                    ),
                   ),
                 ),
-              ),
-              _passInputWithLabel("Password", _passCtrl),
-              _passInputWithLabel("Confirm Password", _confCtrl),
-              const SizedBox(height: 40),
-              figmaButton("SignUp", doSignup),
-            ],
+                const SizedBox(height: 10),
+
+                // PASSWORD VALIDATION + EYE ICON
+                figmaLabel("Password"),
+                _buildValidatedInput(_passCtrl, isPass: true, obscure: _obscurePass, onToggle: () => setState(() => _obscurePass = !_obscurePass), validator: (value) {
+                  if (value == null || value.isEmpty) return 'Please enter a password';
+                  if (RegExp(r'[\u00A9\u00AE\u2000-\u3300\ud83c\ud000-\ud83c\udfff\ud83d\ud000-\ud83d\udfff\ud83e\ud000-\ud83e\udfff]').hasMatch(value)) return 'Password cannot contain emojis';
+                  return null;
+                }),
+                const SizedBox(height: 10),
+
+                // CONFIRM PASSWORD VALIDATION + EYE ICON
+                figmaLabel("Confirm Password"),
+                _buildValidatedInput(_confCtrl, isPass: true, obscure: _obscureConf, onToggle: () => setState(() => _obscureConf = !_obscureConf), validator: (value) {
+                  if (value == null || value.isEmpty) return 'Please confirm your password';
+                  if (value != _passCtrl.text) return 'Passwords do not match';
+                  return null;
+                }),
+                
+                const SizedBox(height: 40),
+                Center(child: figmaButton("SignUp", doSignup)),
+              ],
+            ),
           ),
         ),
       ),
-    );
-  }
-
-  Widget _passInputWithLabel(String label, TextEditingController ctrl) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start, 
-      children: [
-        figmaLabel(label), 
-        figmaInputAuth(ctrl, isPass: true)
-      ],
     );
   }
 }
@@ -220,13 +319,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _saveProfile() async {
     try {
       var res = await http.post(
-        Uri.parse('https://huramay-app.onrender.com/api/user/update'), // FIXED: Using https://huramay-app.onrender.com
+        Uri.parse('https://huramay-app.onrender.com/api/user/update'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'id': currentUser!['id'], 'photo_path': _localPhotoPath ?? ""}),
       );
       if (res.statusCode == 200) {
         currentUser!['photo_path'] = _localPhotoPath;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile Saved!")));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile Saved!")));
       }
     } catch (e) {}
   }
@@ -246,7 +345,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ));
     
     return Scaffold(
-      backgroundColor: Colors.white, // Clean white background
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A0088),
         elevation: 0,
@@ -259,7 +358,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.all(25),
         child: Column(
           children: [
-            // 1. Modern Interactive Avatar
             Center(
               child: Stack(
                 children: [
@@ -297,11 +395,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 35),
 
-            // 2. User Information Card
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFFF3F4F6), // Matches the dashboard grey
+                color: const Color(0xFFF3F4F6),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: Colors.black12),
               ),
@@ -323,7 +420,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 20),
 
-            // 3. Trust Rating Highlight Box
             Container(
               padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
               decoration: BoxDecoration(
@@ -341,7 +437,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 35),
 
-            // 4. Action Buttons
             ElevatedButton.icon(
               onPressed: () {
                 Navigator.push(context, MaterialPageRoute(builder: (c) => const PasswordResetScreen()));
@@ -438,10 +533,11 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty || _passCtrl.text != _confCtrl.text) return;
     try {
       var res = await http.post(
-        Uri.parse('https://huramay-app.onrender.com/api/user/reset_password'), // FIXED: Using https://huramay-app.onrender.com
+        Uri.parse('https://huramay-app.onrender.com/api/user/reset_password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': _emailCtrl.text, 'new_password': _passCtrl.text, 'current_user_id': currentUser!['id']}),
       );
+      if (!mounted) return;
       if (res.statusCode == 200) Navigator.pop(context);
     } catch (e) {}
   }
