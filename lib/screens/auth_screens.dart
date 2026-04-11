@@ -294,7 +294,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 }
 
-// ==================== PROFILE SCREEN (Modernized) ====================
+// ==================== PROFILE SCREEN (Modernized with Base64) ====================
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
   @override
@@ -302,18 +302,25 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  String? _localPhotoPath;
+  // CHANGED: We now store the Base64 string instead of a local file path
+  String? _imageBase64;
 
   @override
   void initState() {
     super.initState();
-    _localPhotoPath = currentUser?['photo_path'];
-    if (_localPhotoPath != null && _localPhotoPath!.isEmpty) _localPhotoPath = null;
+    _imageBase64 = currentUser?['photo_path'];
+    if (_imageBase64 != null && _imageBase64!.isEmpty) _imageBase64 = null;
   }
 
+  // CHANGED: Converts the chosen image into Base64 text
   Future<void> _pickImage() async {
     final image = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (image != null) setState(() => _localPhotoPath = image.path);
+    if (image != null) {
+      final bytes = await File(image.path).readAsBytes();
+      setState(() {
+        _imageBase64 = base64Encode(bytes); // Convert to text!
+      });
+    }
   }
 
   Future<void> _saveProfile() async {
@@ -321,10 +328,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       var res = await http.post(
         Uri.parse('https://huramay-app.onrender.com/api/user/update'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'id': currentUser!['id'], 'photo_path': _localPhotoPath ?? ""}),
+        // Send the massive text string to the database
+        body: jsonEncode({'id': currentUser!['id'], 'photo_path': _imageBase64 ?? ""}),
       );
       if (res.statusCode == 200) {
-        currentUser!['photo_path'] = _localPhotoPath;
+        currentUser!['photo_path'] = _imageBase64; // Update the current user data
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile Saved!")));
       }
     } catch (e) {}
@@ -358,6 +366,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.all(25),
         child: Column(
           children: [
+            // 1. Modern Interactive Avatar
             Center(
               child: Stack(
                 children: [
@@ -368,11 +377,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: const Color(0xFFF3F4F6),
                       shape: BoxShape.circle,
                       border: Border.all(color: const Color(0xFF1A0088), width: 3),
-                      image: _localPhotoPath != null 
-                        ? DecorationImage(image: FileImage(File(_localPhotoPath!)), fit: BoxFit.cover) 
+                      // CHANGED: Decodes the Base64 text back into an image
+                      image: (_imageBase64 != null && _imageBase64!.isNotEmpty)
+                        ? DecorationImage(
+                            image: MemoryImage(base64Decode(_imageBase64!)), 
+                            fit: BoxFit.cover
+                          ) 
                         : null,
                     ),
-                    child: _localPhotoPath == null ? const Icon(Icons.person, size: 65, color: Colors.grey) : null,
+                    child: (_imageBase64 == null || _imageBase64!.isEmpty) 
+                      ? const Icon(Icons.person, size: 65, color: Colors.grey) 
+                      : null,
                   ),
                   Positioned(
                     bottom: 0,
@@ -395,6 +410,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 35),
 
+            // 2. User Information Card
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -420,6 +436,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 20),
 
+            // 3. Trust Rating Highlight Box
             Container(
               padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
               decoration: BoxDecoration(
@@ -437,6 +454,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 35),
 
+            // 4. Action Buttons
             ElevatedButton.icon(
               onPressed: () {
                 Navigator.push(context, MaterialPageRoute(builder: (c) => const PasswordResetScreen()));
