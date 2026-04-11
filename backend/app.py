@@ -98,8 +98,15 @@ with app.app_context():
 def register():
     try:
         data = request.get_json()
+        
+        # --- NEW FIX: Check for @gmail.com extension ---
+        if not data['email'].endswith('@gmail.com'):
+            return jsonify({"message": "Email must have an extension of @gmail.com"}), 400
+        # -----------------------------------------------
+
         if User.query.filter_by(email=data['email']).first():
             return jsonify({"message": "Email already registered"}), 400
+            
         hashed_pass = bcrypt.generate_password_hash(data['password']).decode('utf-8')
         new_user = User(full_name=data['full_name'], email=data['email'], 
                         department=data['department'], password=hashed_pass)
@@ -127,7 +134,7 @@ def login():
 @app.route('/api/user/update', methods=['POST'])
 def update_profile():
     data = request.get_json()
-    user = User.query.get(data['id'])
+    user = db.session.get(User, data['id'])
     if user:
         user.photo_path = data.get('photo_path', user.photo_path)
         db.session.commit()
