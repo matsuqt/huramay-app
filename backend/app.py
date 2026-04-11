@@ -2,8 +2,12 @@ from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from flask_bcrypt import Bcrypt
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import os
+
+def get_ph_time():
+    # Always returns the current time in the Philippines (UTC+8)
+    return datetime.now(timezone.utc) + timedelta(hours=8)
 
 app = Flask(__name__)
 CORS(app)
@@ -67,7 +71,7 @@ class ChatMessage(db.Model):
     Sender_ID = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     Receiver_ID = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     Message_Text = db.Column(db.Text, nullable=False)
-    Timestamp = db.Column(db.DateTime, default=datetime.now)
+    Timestamp = db.Column(db.DateTime, default=get_ph_time)
     Is_Read = db.Column(db.Boolean, default=False) 
 
 class ReportItem(db.Model):
@@ -75,7 +79,7 @@ class ReportItem(db.Model):
     reporter_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     item_id = db.Column(db.Integer, db.ForeignKey('item.id'), nullable=False)
     report_text = db.Column(db.Text, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.now)
+    timestamp = db.Column(db.DateTime, default=get_ph_time)
     reporter = db.relationship('User')
     item = db.relationship('Item')
 
@@ -86,7 +90,7 @@ class Review(db.Model):
     lender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     rating = db.Column(db.Integer, nullable=False)
     comment = db.Column(db.Text, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.now)
+    timestamp = db.Column(db.DateTime, default=get_ph_time)
     
     reviewer = db.relationship('User', foreign_keys=[reviewer_id])
 
