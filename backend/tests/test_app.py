@@ -59,6 +59,33 @@ def test_successful_signup(client):
     assert response.status_code == 201
     assert json.loads(response.data)['message'] == "Registration successful!"
 
+def test_signup_fullname_with_special_character(client):
+    # Unsuccessful signup because full name contains invalid special characters
+    response = client.post('/api/register', json={
+        "full_name": "Matthew Valila!", # Contains the '!' symbol
+        "email": "matthew_valid@gmail.com",
+        "department": "BSIT",
+        "password": "securepassword123"
+    })
+    
+    assert response.status_code == 400
+    data = json.loads(response.data)
+    # Check that the error message mentions the name
+    assert "name" in data['message'].lower()
+
+def test_signup_fullname_with_emoji(client):
+    # Unsuccessful signup because full name contains an emoji
+    response = client.post('/api/register', json={
+        "full_name": "Matthew Valila 👨‍💻", # Contains an emoji
+        "email": "matthew_valid2@gmail.com",
+        "department": "BSIT",
+        "password": "securepassword123"
+    })
+    
+    assert response.status_code == 400
+    data = json.loads(response.data)    
+    assert "name" in data['message'].lower()
+
 def test_signup_wrong_email_extension(client):
     # VAVT-03: Unsuccessful signup because email is not @gmail.com (@edu.ph).
     response = client.post('/api/register', json={
@@ -71,6 +98,46 @@ def test_signup_wrong_email_extension(client):
     # If your backend currently allows this, this test will FAIL, alerting you to fix app.py!
     assert response.status_code == 400
     assert "gmail.com" in json.loads(response.data).get('message', '').lower()
+
+def test_signup_email_with_special_character(client):
+    # VAVT-04/05: Unsuccessful signup because email contains invalid special characters
+    response = client.post('/api/register', json={
+        "full_name": "Matthew Valila",
+        "email": "matthew#valila@gmail.com", # Contains the '#' symbol
+        "department": "BSIT",
+        "password": "securepassword123"
+    })
+    
+    # We expect the server to block this and return a 400 Bad Request
+    assert response.status_code == 400
+    data = json.loads(response.data)
+    assert "special character" in data['message'].lower() or "emoji" in data['message'].lower()
+
+def test_signup_email_with_emoji(client):
+    # VAVT-06: Unsuccessful signup because email contains an emoji
+    response = client.post('/api/register', json={
+        "full_name": "Matthew Valila",
+        "email": "matthew😎@gmail.com", # Contains an emoji
+        "department": "BSIT",
+        "password": "securepassword123"
+    })
+    
+    assert response.status_code == 400
+    data = json.loads(response.data)
+    assert "special character" in data['message'].lower() or "emoji" in data['message'].lower()
+
+def test_signup_password_with_emoji(client):
+    # VAVT-08: Unsuccessful signup because password contains an emoji
+    response = client.post('/api/register', json={
+        "full_name": "Matthew Valila",
+        "email": "matthewvalila@gmail.com",
+        "department": "BSIT",
+        "password": "securepassword123😊" # Contains an emoji
+    })
+    
+    assert response.status_code == 400
+    data = json.loads(response.data)
+    assert "emoji" in data['message'].lower()
 
 def test_register_duplicate_email(client):
     # Test that the app blocks two users from using the same email.
@@ -435,3 +502,61 @@ def test_submit_report(client):
     
     assert response.status_code == 201
     assert json.loads(response.data)['message'] == "Report submitted successfully!"
+
+# ==========================================
+# --------------- ADMIN MODULE -------------
+# ==========================================
+
+def test_admin_create_new_admin_success(client):
+    # VAVT-18 (Admin PDF): Test if an admin can successfully create another admin.
+    response = client.post('/api/admins/create', json={
+        "full_name": "admin1",
+        "email": "admin1@gmail.com",
+        "password": "qwertyuiop"
+    })
+    
+    assert response.status_code == 201
+    data = json.loads(response.data)
+    assert data['message'] == "Admin created successfully!"
+    
+    # Verify they were actually saved as an admin in the database
+    new_admin = User.query.filter_by(email="admin1@gmail.com").first()
+    assert new_admin is not None
+    assert new_admin.is_admin == True
+    assert new_admin.department == "Admin"
+
+def test_admin_create_new_admin_invalid_email(client):
+    # VAVT-19 (Admin PDF): Test if creating an admin fails with a non-gmail extension.
+    # Note: Your backend /api/admins/create route needs to enforce the @gmail.com rule!
+    response = client.post('/api/admins/create', json={
+        "full_name": "admin1",
+        "email": "admin1@lnu.edu.ph",
+        "password": "qwertyuiop"
+    })
+    
+    # Expecting the server to block this
+    assert response.status_code == 400
+
+def test_admin_get_all_reports(client):
+    # Admin Dashboard requires fetching all reports submitted by users.
+    reporter = User(full_name="Reporter", email="reporter@gmail.com", department="IT", password="hash")
+    db.session.add(reporter)
+    db.session.commit()
+
+    item = Item(title="Broken Item", description="Scam", owner_name="Bad User", department="IT", user_id=1)
+    db.session.add(item)
+    db.session.commit()
+
+    # Submit a fake report directly to the DB
+    from app import ReportItem
+    report = ReportItem(reporter_id=reporter.id, item_id=item.id, report_text="Bad item")
+    db.session.add(report)
+    db.session.commit()
+
+    # Test the Admin route to fetch all reports
+    response = client.get('/api/reports/all')
+    
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert len(data) == 1
+    assert data[0]['report_text'] == "Bad item"
