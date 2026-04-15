@@ -4,6 +4,7 @@ from flask_cors import CORS
 from flask_bcrypt import Bcrypt
 from datetime import datetime, timedelta, timezone
 import os
+import re
 
 def get_ph_time():
     # Always returns the current time in the Philippines (UTC+8)
@@ -97,28 +98,41 @@ class Review(db.Model):
 with app.app_context():
     db.create_all()
 
-# --- AUTH ROUTES ---
 @app.route('/api/register', methods=['POST'])
 def register():
     try:
         data = request.get_json()
+        email_input = data.get('email', '')
+        password_input = data.get('password', '')
+        full_name_input = data.get('full_name', '')
         
-        # --- NEW FIX: Check for @gmail.com extension ---
-        if not data['email'].endswith('@gmail.com'):
-            return jsonify({"message": "Email must have an extension of @gmail.com"}), 400
-        # -----------------------------------------------
+        # --- NEW FIX: Strict Regex Validation ---
+        
+        # 1. Check Full Name: Only allows letters, spaces, and periods
+        if not re.match(r'^[a-zA-Z\s\.]+$', full_name_input):
+            return jsonify({"message": "Name cannot contain numbers, special characters, or emojis"}), 400
 
-        if User.query.filter_by(email=data['email']).first():
+        # 2. Check Email: Only allows letters, numbers, dots, and underscores before @gmail.com
+        if not re.match(r'^[a-zA-Z0-9._]+@gmail\.com$', email_input):
+            return jsonify({"message": "Email contains special characters or emojis, or is not a @gmail.com address"}), 400
+            
+        # 3. Check Password: Blocks non-ASCII characters (which includes all emojis)
+        if re.search(r'[^\x00-\x7F]', password_input):
+            return jsonify({"message": "Password cannot contain emojis"}), 400
+            
+        # ----------------------------------------
+
+        if User.query.filter_by(email=email_input).first():
             return jsonify({"message": "Email already registered"}), 400
             
-        hashed_pass = bcrypt.generate_password_hash(data['password']).decode('utf-8')
-        new_user = User(full_name=data['full_name'], email=data['email'], 
+        hashed_pass = bcrypt.generate_password_hash(password_input).decode('utf-8')
+        new_user = User(full_name=full_name_input, email=email_input, 
                         department=data['department'], password=hashed_pass)
         db.session.add(new_user)
         db.session.commit()
         return jsonify({"message": "Registration successful!"}), 201
-    except:
-        return jsonify({"message": "Server Error"}), 500
+    except Exception as e:
+        return jsonify({"message": f"Server Error: {str(e)}"}), 500
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -465,13 +479,22 @@ def get_admins():
 @app.route('/api/admins/create', methods=['POST'])
 def create_admin():
     data = request.get_json()
-    if User.query.filter_by(email=data['email']).first():
+    email_input = data.get('email', '')
+    
+    # --- ADDED REGEX CHECKS FOR ADMIN CREATION ---
+    if not re.match(r'^[a-zA-Z0-9._]+@gmail\.com$', email_input):
+        return jsonify({"message": "Email contains special characters or emojis, or is not a @gmail.com address"}), 400
+    if re.search(r'[^\x00-\x7F]', data.get('password', '')):
+        return jsonify({"message": "Password cannot contain emojis"}), 400
+    # ---------------------------------------------
+
+    if User.query.filter_by(email=email_input).first():
         return jsonify({"message": "Email already registered"}), 400
     
     hashed_pass = bcrypt.generate_password_hash(data['password']).decode('utf-8')
     new_admin = User(
         full_name=data['full_name'], 
-        email=data['email'], 
+        email=email_input, 
         department="Admin", 
         password=hashed_pass, 
         is_admin=True
