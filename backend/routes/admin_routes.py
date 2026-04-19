@@ -20,20 +20,31 @@ def get_admins():
 @admin_bp.route('/api/admins/create', methods=['POST'])
 def create_admin():
     data = request.get_json()
-    email_input = data.get('email', '')
     
-    # Strict Regex Checks for Admin Creation
-    if not re.match(r'^[a-zA-Z0-9._]+@gmail\.com$', email_input):
-        return jsonify({"message": "Email contains special characters or emojis, or is not a @gmail.com address"}), 400
-    if re.search(r'[^\x00-\x7F]', data.get('password', '')):
-        return jsonify({"message": "Password cannot contain emojis"}), 400
+    full_name_input = data.get('full_name', '')
+    email_input = data.get('email', '')
+    password_input = data.get('password', '')
+    
+    # 1. Full Name Validation: Only letters, spaces, and periods (.) - NO emojis.
+    if not re.match(r'^[a-zA-Z\s.]+$', full_name_input):
+        return jsonify({"message": "Full name can only contain letters, spaces, and periods."}), 400
 
+    # 2. Email Validation: Must end in @gmail.com and have no emojis/special characters
+    if not re.match(r'^[a-zA-Z0-9._]+@gmail\.com$', email_input):
+        return jsonify({"message": "Email must be a valid @gmail.com address without emojis."}), 400
+        
+    # 3. Password Validation: Block non-ASCII characters (Emojis)
+    if re.search(r'[^\x00-\x7F]', password_input):
+        return jsonify({"message": "Password cannot contain emojis."}), 400
+
+    # 4. Check if email already exists
     if User.query.filter_by(email=email_input).first():
         return jsonify({"message": "Email already registered"}), 400
     
-    hashed_pass = bcrypt.generate_password_hash(data['password']).decode('utf-8')
+    # If all checks pass, create the admin!
+    hashed_pass = bcrypt.generate_password_hash(password_input).decode('utf-8')
     new_admin = User(
-        full_name=data['full_name'], 
+        full_name=full_name_input, 
         email=email_input, 
         department="Admin", 
         password=hashed_pass, 
