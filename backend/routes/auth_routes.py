@@ -1,0 +1,52 @@
+# backend/routes/auth_routes.py
+from flask import Blueprint, request, jsonify
+from database import db, bcrypt
+from models.user import User
+import re
+
+# Create the Blueprint
+auth_bp = Blueprint('auth', __name__)
+
+@auth_bp.route('/api/register', methods=['POST'])
+def register():
+    try:
+        data = request.get_json()
+        email_input = data.get('email', '')
+        password_input = data.get('password', '')
+        full_name_input = data.get('full_name', '')
+        
+        # Strict Regex Validation
+        if not re.match(r'^[a-zA-Z\s\.]+$', full_name_input):
+            return jsonify({"message": "Name cannot contain numbers, special characters, or emojis"}), 400
+
+        if not re.match(r'^[a-zA-Z0-9._]+@gmail\.com$', email_input):
+            return jsonify({"message": "Email contains special characters or emojis, or is not a @gmail.com address"}), 400
+            
+        if re.search(r'[^\x00-\x7F]', password_input):
+            return jsonify({"message": "Password cannot contain emojis"}), 400
+
+        if User.query.filter_by(email=email_input).first():
+            return jsonify({"message": "Email already registered"}), 400
+            
+        hashed_pass = bcrypt.generate_password_hash(password_input).decode('utf-8')
+        new_user = User(full_name=full_name_input, email=email_input, 
+                        department=data['department'], password=hashed_pass)
+        db.session.add(new_user)
+        db.session.commit()
+        return jsonify({"message": "Registration successful!"}), 201
+    except Exception as e:
+        return jsonify({"message": f"Server Error: {str(e)}"}), 500
+
+@auth_bp.route('/api/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    user = User.query.filter_by(email=data['email']).first()
+    if user and bcrypt.check_password_hash(user.password, data['password']):
+        return jsonify({
+            "id": user.id, "full_name": user.full_name, "email": user.email,               
+            "department": user.department, "photo_path": user.photo_path,     
+            "rating": user.rating, 
+            "is_admin": user.email == 'admin@gmail.com' or user.is_admin,
+            "message": "Login successful!"
+        }), 200
+    return jsonify({"message": "Invalid email or password"}), 401
