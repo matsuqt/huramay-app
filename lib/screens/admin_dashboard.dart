@@ -665,6 +665,7 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
   }
 
   void _showAddAdminModal() {
+    final _formKey = GlobalKey<FormState>();
     final _nameCtrl = TextEditingController();
     final _emailCtrl = TextEditingController();
     final _passCtrl = TextEditingController();
@@ -680,25 +681,49 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             title: const Text("Create New Admin", style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold)),
             content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: _nameCtrl,
-                    decoration: InputDecoration(labelText: "Full Name", filled: true, fillColor: Colors.grey.shade100, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _emailCtrl,
-                    decoration: InputDecoration(labelText: "Email (@gmail.com)", filled: true, fillColor: Colors.grey.shade100, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _passCtrl,
-                    obscureText: true,
-                    decoration: InputDecoration(labelText: "Password", filled: true, fillColor: Colors.grey.shade100, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
-                  ),
-                ],
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: _nameCtrl,
+                      decoration: InputDecoration(labelText: "Full Name", filled: true, fillColor: Colors.grey.shade100, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) return "Name is required";
+                        if (!RegExp(r'^[a-zA-Z\s.]+$').hasMatch(value)) {
+                          return "No special characters/emojis (only periods allowed)";
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _emailCtrl,
+                      decoration: InputDecoration(labelText: "Email (@gmail.com)", filled: true, fillColor: Colors.grey.shade100, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) return "Email is required";
+                        if (!RegExp(r'^[a-zA-Z0-9._]+@gmail\.com$').hasMatch(value)) {
+                          return "Must end in @gmail.com without emojis";
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _passCtrl,
+                      obscureText: true,
+                      decoration: InputDecoration(labelText: "Password", filled: true, fillColor: Colors.grey.shade100, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) return "Password is required";
+                        if (RegExp(r'[^\x00-\x7F]').hasMatch(value)) {
+                          return "Password cannot contain emojis";
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
             actions: [
@@ -711,9 +736,8 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
                 ? const CircularProgressIndicator() 
                 : ElevatedButton(
                     onPressed: () async {
-                      if (_nameCtrl.text.trim().isEmpty || _emailCtrl.text.trim().isEmpty || _passCtrl.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill all fields.")));
-                        return;
+                      if (!_formKey.currentState!.validate()) {
+                        return; // Stops here if there's an emoji or invalid input
                       }
                       
                       setModalState(() => isSubmitting = true);
