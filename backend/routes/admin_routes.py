@@ -84,3 +84,27 @@ def ban_user(user_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"message": "Error banning user", "error": str(e)}), 500
+
+# ==========================================
+# NEW ROUTE: Fetch all standard users
+# ==========================================
+@admin_bp.route('/api/users', methods=['GET'])
+def get_all_users():
+    try:
+        # Fetch all standard users (exclude admins)
+        users = User.query.filter((User.is_admin == False) | (User.is_admin == None)).all()
+        
+        user_list = []
+        for user in users:
+            user_list.append({
+                "id": user.id,
+                "full_name": user.full_name,
+                "email": user.email,
+                "department": user.department,
+                "rating": user.rating,
+                "age": getattr(user, 'age', 'N/A') # Grabs your custom age requirement!
+            })
+            
+        return jsonify(user_list), 200
+    except Exception as e:
+        return jsonify({"message": f"Server Error: {str(e)}"}), 500
