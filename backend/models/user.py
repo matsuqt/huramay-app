@@ -10,6 +10,8 @@ class User(db.Model):
     photo_path = db.Column(db.Text, nullable=True, default="")
     rating = db.Column(db.Float, default=5.0) 
     is_admin = db.Column(db.Boolean, default=False)
+    age = db.Column(db.Integer, nullable=True) 
+    fcm_token = db.Column(db.Text, nullable=True) # NEW: Firebase Device Token
     
     # Relationships
     items = db.relationship('Item', backref='owner', lazy=True)

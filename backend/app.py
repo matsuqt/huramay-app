@@ -2,6 +2,8 @@
 from flask import Flask
 from flask_cors import CORS
 from database import db, bcrypt
+import os
+basedir = os.path.abspath(os.path.dirname(__file__))
 
 # Import your Blueprints
 from routes.auth_routes import auth_bp
@@ -16,7 +18,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Database Setup
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///User.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'instance', 'User.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize DB and Bcrypt with the app

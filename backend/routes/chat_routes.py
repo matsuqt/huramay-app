@@ -1,12 +1,47 @@
 # backend/routes/chat_routes.py
+import os
 from flask import Blueprint, request, jsonify
 from database import db
 from models.chat_message import ChatMessage
 from models.user import User
 from models.borrow_request import BorrowRequest
 
+import firebase_admin
+from firebase_admin import credentials, messaging
+
+# ==========================================
+# NEW: INITIALIZE FIREBASE ADMIN SDK
+# ==========================================
+if not firebase_admin._apps:
+    # Looks for the Google Admin Key in your main backend folder
+    cred_path = os.path.join(os.path.dirname(__file__), '..', 'firebase-adminsdk.json')
+    if os.path.exists(cred_path):
+        cred = credentials.Certificate(cred_path)
+        firebase_admin.initialize_app(cred)
+    else:
+        print("WARNING: firebase-adminsdk.json not found! Notifications will fail.")
+
+
 # Create the Blueprint
 chat_bp = Blueprint('chat', __name__)
+
+# ==========================================
+# NEW: CATCH AND SAVE THE FCM TOKEN
+# ==========================================
+@chat_bp.route('/api/user/update_token', methods=['POST'])
+def update_token():
+    data = request.get_json()
+    user_id = data.get('user_id')
+    fcm_token = data.get('fcm_token')
+
+    if user_id and fcm_token:
+        user = User.query.get(user_id)
+        if user:
+            user.fcm_token = fcm_token
+            db.session.commit()
+            return jsonify({"message": "Token updated successfully"}), 200
+    return jsonify({"error": "Invalid data"}), 400
+
 
 @chat_bp.route('/api/messages/inbox/<int:user_id>', methods=['GET'])
 def get_inbox(user_id):
@@ -51,14 +86,40 @@ def get_chat_history(room_id):
 @chat_bp.route('/api/messages/send', methods=['POST'])
 def send_message():
     data = request.get_json()
+    sender_id = data['sender_id']
+    receiver_id = data['receiver_id']
+    content = data['content']
+
     new_msg = ChatMessage(
         Chat_Room_ID=data['chat_room_id'],
-        Sender_ID=data['sender_id'],
-        Receiver_ID=data['receiver_id'],
-        Message_Text=data['content']
+        Sender_ID=sender_id,
+        Receiver_ID=receiver_id,
+        Message_Text=content
     )
     db.session.add(new_msg)
     db.session.commit()
+
+    # ==========================================
+    # NEW: SEND THE NOTIFICATION PING
+    # ==========================================
+    try:
+        sender = User.query.get(sender_id)
+        receiver = User.query.get(receiver_id)
+
+        # Check if the receiver has an active device token
+        if receiver and receiver.fcm_token and firebase_admin._apps:
+            message = messaging.Message(
+                notification=messaging.Notification(
+                    title=f"Huramay: {sender.full_name}",
+                    body=content,
+                ),
+                token=receiver.fcm_token,
+            )
+            messaging.send(message)
+            print(f"Pinged Firebase for {receiver.full_name}!")
+    except Exception as e:
+        print(f"FCM Send Error: {e}")
+
     return jsonify({"message": "Sent!"}), 201
 
 @chat_bp.route('/api/messages/unread/<int:user_id>', methods=['GET'])

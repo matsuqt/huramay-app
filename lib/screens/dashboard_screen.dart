@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
+import 'package:firebase_messaging/firebase_messaging.dart'; // NEW: Firebase Messaging Import
 
 import '../widgets/app_sidebar.dart';
 import '../utils/ui_helpers.dart';
 import 'auth_screens.dart';
 import 'item_screens.dart';
+import '../globals.dart'; // Needed to access currentUser
 
 // ==================== DASHBOARD SCREEN ====================
 class DashboardScreen extends StatefulWidget {
@@ -26,6 +28,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _fetchItems();
+    _setupFCMToken(); // NEW: Triggers token generation the moment the dashboard opens
+  }
+
+  // ==========================================
+  // NEW: FCM TOKEN GENERATOR
+  // ==========================================
+  Future<void> _setupFCMToken() async {
+    try {
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+      
+      // 1. Request permission (Crucial for Android 13+ and iOS to show notifications)
+      await messaging.requestPermission();
+
+      // 2. Grab the unique device token from Google
+      String? token = await messaging.getToken();
+      
+      if (token != null && currentUser != null) {
+        debugPrint("📱 FIREBASE DEVICE TOKEN: $token"); // Prints to your VS Code terminal for verification
+        
+        // 3. Send the token to your Python backend to save it
+        await http.post(
+          Uri.parse('https://huramay-app.onrender.com/api/user/update_token'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'user_id': currentUser!['id'],
+            'fcm_token': token,
+          }),
+        );
+      }
+    } catch (e) {
+      debugPrint("FCM Setup Error: $e");
+    }
   }
 
   Future<void> _fetchItems() async {
@@ -76,7 +110,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onChanged: (value) => _fetchItems(), 
             decoration: const InputDecoration(
               hintText: "Search",
-              prefixIcon: Icon(Icons.search, color: Colors.grey), // Icons can stay grey, text should be black
+              prefixIcon: Icon(Icons.search, color: Colors.grey), 
               border: InputBorder.none,
               contentPadding: EdgeInsets.symmetric(vertical: 8),
             ),
@@ -111,7 +145,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 Row(
                   children: [
-                    // CHANGED TO BLACK
                     const Text("Filters ", style: TextStyle(fontSize: 12, color: Colors.black, fontWeight: FontWeight.bold)),
                     Container(
                       height: 35,
@@ -146,7 +179,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ? _emptyStateDashboard() 
                   : ListView.builder(
                       physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.only(bottom: 80), // Padding so FAB doesn't cover last item
+                      padding: const EdgeInsets.only(bottom: 80), 
                       itemCount: items.length,
                       itemBuilder: (c, i) => _itemCard(context, items[i]),
                     ),
@@ -186,7 +219,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Text(
             message,
             textAlign: TextAlign.center,
-            // CHANGED TO BLACK
             style: const TextStyle(
               color: Colors.black,
               fontSize: 24,
@@ -286,7 +318,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   const SizedBox(height: 6),
                   Text(
                     "Qty: ${item['quantity']}  •  Cond: ${item['condition']}",
-                    // CHANGED TO BLACK
                     style: const TextStyle(fontSize: 12, color: Colors.black, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
@@ -294,7 +325,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     alignment: Alignment.bottomRight,
                     child: Text(
                       "Tap to view details", 
-                      // CHANGED TO BLACK
                       style: TextStyle(fontSize: 10, color: Colors.black, fontStyle: FontStyle.italic)
                     ),
                   ),

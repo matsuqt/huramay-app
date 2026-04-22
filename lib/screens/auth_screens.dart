@@ -10,6 +10,58 @@ import '../utils/ui_helpers.dart';
 import 'dashboard_screen.dart';
 import 'admin_dashboard.dart'; 
 
+// ==================== MODERN UI TOAST HELPERS ====================
+void showErrorToast(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).hideCurrentSnackBar(); // Dismiss existing
+  
+  // Calculate screen height to push the toast to the top
+  final screenHeight = MediaQuery.of(context).size.height;
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: [
+          const Icon(Icons.error_outline, color: Colors.white, size: 24),
+          const SizedBox(width: 12),
+          Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14))),
+        ],
+      ),
+      backgroundColor: Colors.red.shade700, 
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      // Pushes the SnackBar to the top, sitting just below the status bar
+      margin: EdgeInsets.only(bottom: screenHeight - 130, left: 20, right: 20),
+      dismissDirection: DismissDirection.up, // Swipe up to dismiss
+      elevation: 10,
+      duration: const Duration(seconds: 4),
+    ),
+  );
+}
+
+void showSuccessToast(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+  
+  final screenHeight = MediaQuery.of(context).size.height;
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: [
+          const Icon(Icons.check_circle_outline, color: Colors.white, size: 24),
+          const SizedBox(width: 12),
+          Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14))),
+        ],
+      ),
+      backgroundColor: Colors.green.shade700, 
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      margin: EdgeInsets.only(bottom: screenHeight - 130, left: 20, right: 20),
+      dismissDirection: DismissDirection.up,
+      elevation: 10,
+      duration: const Duration(seconds: 3),
+    ),
+  );
+}
 // ==================== AUTH & PROFILE SCREENS ====================
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -21,22 +73,26 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   
-  // NEW: Added FormKey and visibility boolean
   final _formKey = GlobalKey<FormState>();
   bool _obscurePass = true;
+  bool _isLoading = false;
 
   Future<void> doLogin() async {
-    // NEW: Trigger validators before making the HTTP request
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      showErrorToast(context, "Please fix the missing fields to login.");
+      return;
+    }
+
+    setState(() => _isLoading = true);
 
     try {
       var res = await http.post(
         Uri.parse('https://huramay-app.onrender.com/api/login'), 
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': _emailCtrl.text, 'password': _passCtrl.text}),
+        body: jsonEncode({'email': _emailCtrl.text.trim(), 'password': _passCtrl.text}),
       );
       
-      if (!mounted) return; // FIX: Prevent BuildContext across async gaps warning
+      if (!mounted) return; 
 
       var data = jsonDecode(res.body);
       
@@ -44,20 +100,24 @@ class _LoginScreenState extends State<LoginScreen> {
         currentUser = data;
         bool isAdmin = data['is_admin'] ?? false;
 
+        showSuccessToast(context, "Welcome back!");
+        
         if (isAdmin) {
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const AdminDashboard()));
         } else {
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const DashboardScreen()));
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'])));
+        // Triggers the modern red toast from the backend response
+        showErrorToast(context, data['message']);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Connection Error")));
+      showErrorToast(context, "Connection Error. Please check your internet.");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // NEW: Helper method to support validators and the eye icon
   Widget _buildValidatedInput(TextEditingController ctrl, {bool isPass = false, String? Function(String?)? validator}) {
     return TextFormField(
       controller: ctrl,
@@ -68,7 +128,8 @@ class _LoginScreenState extends State<LoginScreen> {
         fillColor: Colors.white,
         contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-        errorStyle: const TextStyle(color: Color.fromARGB(255, 255, 0, 0), fontWeight: FontWeight.bold, fontSize: 13),
+        // Made the inline text error softer so the Toast takes priority
+        errorStyle: TextStyle(color: Colors.red.shade200, fontWeight: FontWeight.bold, fontSize: 12),
         suffixIcon: isPass ? IconButton(
           icon: Icon(_obscurePass ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
           onPressed: () => setState(() => _obscurePass = !_obscurePass),
@@ -87,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
         decoration: figmaBackground(),
         child: Padding(
           padding: const EdgeInsets.all(40),
-          child: Form( // NEW: Wrapped in Form
+          child: Form( 
             key: _formKey,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -99,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 
                 figmaLabel("Email"),
                 _buildValidatedInput(_emailCtrl, validator: (value) {
-                  if (value == null || value.isEmpty) return 'Please enter your email';
+                  if (value == null || value.isEmpty) return 'Required';
                   return null;
                 }),
                 
@@ -107,7 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 
                 figmaLabel("Password"),
                 _buildValidatedInput(_passCtrl, isPass: true, validator: (value) {
-                  if (value == null || value.isEmpty) return 'Please enter your password';
+                  if (value == null || value.isEmpty) return 'Required';
                   return null;
                 }),
                 
@@ -118,12 +179,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     const Text("Don't have an account? ", style: TextStyle(color: Colors.white)),
                     GestureDetector(
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const SignUpScreen())),
-                      child: const Text("SignUp", style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                      child: const Text("SignUp", style: TextStyle(color: Colors.yellow, fontWeight: FontWeight.bold)),
                     )
                   ],
                 ),
                 const SizedBox(height: 40),
-                figmaButton("Login", doLogin),
+                _isLoading 
+                  ? const CircularProgressIndicator(color: Colors.yellow)
+                  : figmaButton("Login", doLogin),
               ],
             ),
           ),
@@ -146,47 +209,51 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _confCtrl = TextEditingController();
   String? _selectedDept;
   
-  // NEW: Added FormKey and visibility booleans
   final _formKey = GlobalKey<FormState>();
   bool _obscurePass = true;
   bool _obscureConf = true;
+  bool _isLoading = false;
 
   final List<String> _lnuDepartments = [
     'Bachelor of Elementary Education', 'Bachelor of Early Childhood Education', 'Bachelor of Special Needs Education', 'Bachelor of Technology and Livelihood Education', 'Bachelor of Physical Education', 'Bachelor of Secondary Education major in English', 'Bachelor of Secondary Education major in Filipino', 'Bachelor of Secondary Education major in Mathematics', 'Bachelor of Secondary Education major in Science', 'Bachelor of Secondary Education major in Social Studies', 'Bachelor of Secondary Education major in Values Education', 'Teacher Certificate Program (TCP)', 'Bachelor of Library and Information Science', 'Bachelor of Arts in Communication', 'Bachelor of Music in Music Education', 'Bachelor of Science in Information Technology', 'Bachelor of Arts in English Language', 'Bachelor of Arts in Political Science', 'Bachelor of Science in Biology', 'Bachelor of Science in Social Work', 'Bachelor of Science in Tourism Management', 'Bachelor of Science in Hospitality Management', 'Bachelor of Science in Entrepreneurship', 'Faculty / Staff'
   ];
 
   Future<void> doSignup() async {
-    // NEW: Trigger validators (Regex for emojis, special chars, matching passwords)
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      showErrorToast(context, "Please fix the form errors before submitting.");
+      return;
+    }
     if (_selectedDept == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a department")));
+      showErrorToast(context, "Please select your department from the dropdown.");
       return;
     }
     
+    setState(() => _isLoading = true);
     String emailInput = _emailCtrl.text.trim().toLowerCase();
     
     try {
       var res = await http.post(
         Uri.parse('https://huramay-app.onrender.com/api/register'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'full_name': _nameCtrl.text, 'email': emailInput, 'department': _selectedDept, 'password': _passCtrl.text}),
+        body: jsonEncode({'full_name': _nameCtrl.text.trim(), 'email': emailInput, 'department': _selectedDept, 'password': _passCtrl.text}),
       );
       
-      if (!mounted) return; // FIX: Prevent BuildContext across async gaps warning
+      if (!mounted) return;
 
       if (res.statusCode == 201) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Account created! Please log in.")));
+        showSuccessToast(context, "Account created! Please log in.");
       } else {
         var data = jsonDecode(res.body);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'])));
+        showErrorToast(context, data['message']);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Connection Error")));
+      showErrorToast(context, "Connection Error. Please check your internet.");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // NEW: Helper method to support validators and the eye icon
   Widget _buildValidatedInput(TextEditingController ctrl, {bool isPass = false, bool? obscure, VoidCallback? onToggle, String? Function(String?)? validator}) {
     return TextFormField(
       controller: ctrl,
@@ -197,6 +264,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         fillColor: Colors.white,
         contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+        errorStyle: TextStyle(color: Colors.red.shade200, fontWeight: FontWeight.bold, fontSize: 11),
         suffixIcon: isPass ? IconButton(
           icon: Icon(obscure! ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
           onPressed: onToggle,
@@ -215,39 +283,43 @@ class _SignUpScreenState extends State<SignUpScreen> {
         decoration: figmaBackground(),
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(40),
-          child: Form( // NEW: Wrapped in Form
+          child: Form( 
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 60),
+                const SizedBox(height: 50),
+                Align(
+                  alignment: Alignment.topLeft,
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white, size: 30),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
                 const Center(child: Text("Huramay", style: TextStyle(fontSize: 45, color: Colors.white, fontWeight: FontWeight.bold))),
                 const SizedBox(height: 10),
                 const Center(child: Text("SignUp", style: TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.bold))),
                 const SizedBox(height: 30),
                 
-                // NAME VALIDATION
                 figmaLabel("Full Name"),
                 _buildValidatedInput(_nameCtrl, validator: (value) {
-                  if (value == null || value.isEmpty) return 'Please enter your name';
-                  if (!RegExp(r'^[a-zA-Z\s\.]+$').hasMatch(value)) return 'No numbers, special characters, or emoji';
+                  if (value == null || value.isEmpty) return 'Required';
+                  if (!RegExp(r'^[a-zA-Z\s\.]+$').hasMatch(value)) return 'No numbers or special characters';
                   return null;
                 }),
                 const SizedBox(height: 10),
 
-                // EMAIL VALIDATION
                 figmaLabel("Email"),
                 _buildValidatedInput(_emailCtrl, validator: (value) {
-                  if (value == null || value.isEmpty) return 'Please enter your email';
+                  if (value == null || value.isEmpty) return 'Required';
                   bool hasEmoji = RegExp(r'[\u00A9\u00AE\u2000-\u3300\ud83c\ud000-\ud83c\udfff\ud83d\ud000-\ud83d\udfff\ud83e\ud000-\ud83e\udfff]').hasMatch(value);
                   bool hasSpecialChars = value.contains(RegExp(r'[!#\$%^&*() \?":{}|<>]'));
-                  if (hasEmoji || hasSpecialChars) return 'No special characters other @ or emoji allowed';
-                  if (!value.toLowerCase().endsWith('@gmail.com')) return 'Email must end with @gmail.com';
+                  if (hasEmoji || hasSpecialChars) return 'No special chars or emoji allowed';
+                  if (!value.toLowerCase().endsWith('@gmail.com')) return 'Must end with @gmail.com';
                   return null;
                 }),
                 const SizedBox(height: 10),
 
-                // DEPARTMENT
                 figmaLabel("Department"),
                 Container(
                   decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
@@ -260,31 +332,30 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       items: _lnuDepartments.map((d) => DropdownMenuItem(value: d, child: Text(d, style: const TextStyle(fontSize: 12, color: Colors.black, fontWeight: FontWeight.bold)))).toList(),
                       onChanged: (v) => setState(() => _selectedDept = v),
                       decoration: const InputDecoration(border: InputBorder.none),
-                      validator: (value) => value == null ? 'Please select a department' : null,
                     ),
                   ),
                 ),
                 const SizedBox(height: 10),
 
-                // PASSWORD VALIDATION + EYE ICON
                 figmaLabel("Password"),
                 _buildValidatedInput(_passCtrl, isPass: true, obscure: _obscurePass, onToggle: () => setState(() => _obscurePass = !_obscurePass), validator: (value) {
-                  if (value == null || value.isEmpty) return 'Please enter a password';
-                  if (RegExp(r'[\u00A9\u00AE\u2000-\u3300\ud83c\ud000-\ud83c\udfff\ud83d\ud000-\ud83d\udfff\ud83e\ud000-\ud83e\udfff]').hasMatch(value)) return 'Password cannot contain emojis';
+                  if (value == null || value.isEmpty) return 'Required';
+                  if (RegExp(r'[\u00A9\u00AE\u2000-\u3300\ud83c\ud000-\ud83c\udfff\ud83d\ud000-\ud83d\udfff\ud83e\ud000-\ud83e\udfff]').hasMatch(value)) return 'Cannot contain emojis';
                   return null;
                 }),
                 const SizedBox(height: 10),
 
-                // CONFIRM PASSWORD VALIDATION + EYE ICON
                 figmaLabel("Confirm Password"),
                 _buildValidatedInput(_confCtrl, isPass: true, obscure: _obscureConf, onToggle: () => setState(() => _obscureConf = !_obscureConf), validator: (value) {
-                  if (value == null || value.isEmpty) return 'Please confirm your password';
+                  if (value == null || value.isEmpty) return 'Required';
                   if (value != _passCtrl.text) return 'Passwords do not match';
                   return null;
                 }),
                 
                 const SizedBox(height: 40),
-                Center(child: figmaButton("SignUp", doSignup)),
+                _isLoading 
+                  ? const Center(child: CircularProgressIndicator(color: Colors.yellow))
+                  : Center(child: figmaButton("SignUp", doSignup)),
               ],
             ),
           ),
@@ -294,7 +365,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 }
 
-// ==================== PROFILE SCREEN (Modernized with Base64) ====================
+// ==================== PROFILE SCREEN ====================
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
   @override
@@ -302,8 +373,8 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // CHANGED: We now store the Base64 string instead of a local file path
   String? _imageBase64;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -312,30 +383,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (_imageBase64 != null && _imageBase64!.isEmpty) _imageBase64 = null;
   }
 
-  // CHANGED: Converts the chosen image into Base64 text
   Future<void> _pickImage() async {
     final image = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (image != null) {
       final bytes = await File(image.path).readAsBytes();
       setState(() {
-        _imageBase64 = base64Encode(bytes); // Convert to text!
+        _imageBase64 = base64Encode(bytes);
       });
     }
   }
 
   Future<void> _saveProfile() async {
+    setState(() => _isLoading = true);
     try {
       var res = await http.post(
         Uri.parse('https://huramay-app.onrender.com/api/user/update'),
         headers: {'Content-Type': 'application/json'},
-        // Send the massive text string to the database
         body: jsonEncode({'id': currentUser!['id'], 'photo_path': _imageBase64 ?? ""}),
       );
       if (res.statusCode == 200) {
-        currentUser!['photo_path'] = _imageBase64; // Update the current user data
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile Saved!")));
+        currentUser!['photo_path'] = _imageBase64; 
+        if (mounted) showSuccessToast(context, "Profile Picture Saved!");
+      } else {
+        if (mounted) showErrorToast(context, "Failed to save profile.");
       }
-    } catch (e) {}
+    } catch (e) {
+      if (mounted) showErrorToast(context, "Connection error.");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   void _logout() {
@@ -366,7 +442,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.all(25),
         child: Column(
           children: [
-            // 1. Modern Interactive Avatar
             Center(
               child: Stack(
                 children: [
@@ -377,7 +452,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: const Color(0xFFF3F4F6),
                       shape: BoxShape.circle,
                       border: Border.all(color: const Color(0xFF1A0088), width: 3),
-                      // CHANGED: Decodes the Base64 text back into an image
                       image: (_imageBase64 != null && _imageBase64!.isNotEmpty)
                         ? DecorationImage(
                             image: MemoryImage(base64Decode(_imageBase64!)), 
@@ -410,7 +484,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 35),
 
-            // 2. User Information Card
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -436,7 +509,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 20),
 
-            // 3. Trust Rating Highlight Box
             Container(
               padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
               decoration: BoxDecoration(
@@ -454,7 +526,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 35),
 
-            // 4. Action Buttons
             ElevatedButton.icon(
               onPressed: () {
                 Navigator.push(context, MaterialPageRoute(builder: (c) => const PasswordResetScreen()));
@@ -490,7 +561,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: _saveProfile,
-                    icon: const Icon(Icons.save, size: 20),
+                    icon: _isLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2)) : const Icon(Icons.save, size: 20),
                     label: const Text("Save", style: TextStyle(fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.yellow,
@@ -535,7 +606,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-// ==================== PASSWORD RESET SCREEN (Modernized) ====================
+// ==================== PASSWORD RESET SCREEN ====================
 class PasswordResetScreen extends StatefulWidget {
   const PasswordResetScreen({super.key});
   @override
@@ -548,7 +619,14 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
   final _confCtrl = TextEditingController();
 
   Future<void> doReset() async {
-    if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty || _passCtrl.text != _confCtrl.text) return;
+    if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
+      showErrorToast(context, "Please fill in all fields.");
+      return;
+    }
+    if (_passCtrl.text != _confCtrl.text) {
+      showErrorToast(context, "New passwords do not match.");
+      return;
+    }
     try {
       var res = await http.post(
         Uri.parse('https://huramay-app.onrender.com/api/user/reset_password'),
@@ -556,8 +634,16 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
         body: jsonEncode({'email': _emailCtrl.text, 'new_password': _passCtrl.text, 'current_user_id': currentUser!['id']}),
       );
       if (!mounted) return;
-      if (res.statusCode == 200) Navigator.pop(context);
-    } catch (e) {}
+      if (res.statusCode == 200) {
+        showSuccessToast(context, "Password updated successfully.");
+        Navigator.pop(context);
+      } else {
+        var data = jsonDecode(res.body);
+        showErrorToast(context, data['message'] ?? "Failed to reset password.");
+      }
+    } catch (e) {
+      showErrorToast(context, "Connection error.");
+    }
   }
 
   @override

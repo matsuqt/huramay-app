@@ -8,7 +8,7 @@ import '../globals.dart';
 import 'auth_screens.dart'; // Needed for LoginScreen routing
 
 // =========================================================================
-// 1. ADMIN DASHBOARD
+// 1. ADMIN DASHBOARD WRAPPER (BOTTOM NAV BAR)
 // =========================================================================
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -18,6 +18,62 @@ class AdminDashboard extends StatefulWidget {
 }
 
 class _AdminDashboardState extends State<AdminDashboard> {
+  int _currentIndex = 0;
+
+  // The two main screens for the Admin
+  final List<Widget> _pages = [
+    const AdminItemsFeed(),
+    const AdminUserListScreen(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _pages[_currentIndex], // Switches the screen based on the tab
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -2))]
+        ),
+        child: BottomNavigationBar(
+          backgroundColor: Colors.white,
+          currentIndex: _currentIndex,
+          selectedItemColor: const Color(0xFF1A0088),
+          unselectedItemColor: Colors.grey,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
+          onTap: (index) {
+            setState(() {
+              _currentIndex = index;
+            });
+          },
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.inventory_2_outlined),
+              activeIcon: Icon(Icons.inventory_2),
+              label: 'Items Feed',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.people_outline),
+              activeIcon: Icon(Icons.people),
+              label: 'User Management',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =========================================================================
+// 2. ADMIN ITEMS FEED (Your original dashboard code)
+// =========================================================================
+class AdminItemsFeed extends StatefulWidget {
+  const AdminItemsFeed({super.key});
+
+  @override
+  State<AdminItemsFeed> createState() => _AdminItemsFeedState();
+}
+
+class _AdminItemsFeedState extends State<AdminItemsFeed> {
   List<dynamic> allItems = [];
   bool isLoading = true;
   final TextEditingController _searchCtrl = TextEditingController();
@@ -31,7 +87,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Future<void> _fetchAllItems() async {
     setState(() => isLoading = true);
     try {
-      // FIXED: Swapped hardcoded IP for https://huramay-app.onrender.com
       String url = 'https://huramay-app.onrender.com/api/items';
       String searchQuery = _searchCtrl.text.trim();
       if (searchQuery.isNotEmpty) {
@@ -60,18 +115,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
       }
     } catch (e) {
       debugPrint("Delete error: $e");
-    }
-  }
-
-  Future<void> _executeBan(int userId) async {
-    try {
-      final res = await http.delete(Uri.parse('https://huramay-app.onrender.com/api/users/$userId'));
-      if (res.statusCode == 200) {
-        _fetchAllItems();
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User Banned permanently.")));
-      }
-    } catch (e) {
-      debugPrint("Ban error: $e");
     }
   }
 
@@ -164,7 +207,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           const Padding(
             padding: EdgeInsets.all(20),
             child: Text(
-              "Admin Dashboard",
+              "Item Reports",
               style: TextStyle(
                 fontSize: 28, 
                 fontWeight: FontWeight.bold,
@@ -187,9 +230,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  // =======================================================================
-  // UPDATED: Modern UI Match for the Admin Card
-  // =======================================================================
   Widget _buildAdminCard(dynamic item) {
     String? imgPath = item['image'];
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
@@ -202,14 +242,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFFF3F4F6), // Matches the modern dashboard grey
+            color: const Color(0xFFF3F4F6),
             borderRadius: BorderRadius.circular(15),
             border: Border.all(color: Colors.black12, width: 1),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Left side: The White Image Box with Blue Border
               Container(
                 width: 85,
                 height: 85,
@@ -237,12 +276,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
               ),
               const SizedBox(width: 15),
-              // Right side: Details & Buttons
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Row 1: Name & Status Pill
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -255,7 +292,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           ),
                         ),
                         const SizedBox(width: 5),
-                        // Modern Status Pill (Green for Available, Red for Flagged)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
@@ -275,22 +311,18 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       ],
                     ),
                     const SizedBox(height: 4),
-                    // Row 2: Title
                     Text(
                       item['title'],
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
                       maxLines: 1, overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
-                    // Row 3: Department
                     Text(
                       item['dept'],
                       style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87),
                       maxLines: 1, overflow: TextOverflow.ellipsis,
                     ),
-                    
                     const SizedBox(height: 12),
-                    // Row 4: Buttons docked to the bottom right
                     if (isFlagged)
                       Align(
                         alignment: Alignment.centerRight,
@@ -328,7 +360,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
           color: color,
-          borderRadius: BorderRadius.circular(15), // Softer pill shape
+          borderRadius: BorderRadius.circular(15), 
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 2, offset: const Offset(0, 2))]
         ),
         child: Text(
@@ -341,7 +373,281 @@ class _AdminDashboardState extends State<AdminDashboard> {
 }
 
 // =========================================================================
-// 2. THE ADMIN REPORT OVERLAY DIALOG 
+// 3. NEW: USER MANAGEMENT SCREEN (Tab 2) - High Density + Sorting
+// =========================================================================
+class AdminUserListScreen extends StatefulWidget {
+  const AdminUserListScreen({super.key});
+
+  @override
+  State<AdminUserListScreen> createState() => _AdminUserListScreenState();
+}
+
+class _AdminUserListScreenState extends State<AdminUserListScreen> {
+  List<dynamic> allUsers = [];
+  List<dynamic> filteredUsers = []; 
+  bool isLoading = true;
+  final TextEditingController _searchCtrl = TextEditingController();
+  
+  // Track the current active sort method
+  String _currentSort = 'Name (A-Z)';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUsers();
+  }
+
+  Future<void> _fetchUsers() async {
+    setState(() => isLoading = true);
+    try {
+      final res = await http.get(Uri.parse('https://huramay-app.onrender.com/api/users'));
+      if (res.statusCode == 200) {
+        setState(() {
+          allUsers = jsonDecode(res.body);
+          filteredUsers = List.from(allUsers);
+        });
+        _applySorting(); // Sorts A-Z immediately upon loading!
+      }
+    } catch (e) {
+      debugPrint("Fetch users error: $e");
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  // ==========================================
+  // PROFESSIONAL SORTING LOGIC
+  // ==========================================
+  void _applySorting() {
+    setState(() {
+      if (_currentSort == 'Name (A-Z)') {
+        filteredUsers.sort((a, b) => a['full_name'].toString().toLowerCase().compareTo(b['full_name'].toString().toLowerCase()));
+      } else if (_currentSort == 'Name (Z-A)') {
+        filteredUsers.sort((a, b) => b['full_name'].toString().toLowerCase().compareTo(a['full_name'].toString().toLowerCase()));
+      } else if (_currentSort == 'Department') {
+        // Sorts alphabetically by Department, then by Name
+        filteredUsers.sort((a, b) {
+          int deptComp = a['department'].toString().toLowerCase().compareTo(b['department'].toString().toLowerCase());
+          if (deptComp == 0) {
+            return a['full_name'].toString().toLowerCase().compareTo(b['full_name'].toString().toLowerCase());
+          }
+          return deptComp;
+        });
+      }
+    });
+  }
+
+  void _runFilter(String enteredKeyword) {
+    List<dynamic> results = [];
+    if (enteredKeyword.isEmpty) {
+      results = List.from(allUsers); 
+    } else {
+      results = allUsers.where((user) {
+        final nameLower = user['full_name'].toString().toLowerCase();
+        final emailLower = user['email'].toString().toLowerCase();
+        final deptLower = user['department'].toString().toLowerCase();
+        final searchLower = enteredKeyword.toLowerCase();
+        
+        return nameLower.contains(searchLower) || 
+               emailLower.contains(searchLower) || 
+               deptLower.contains(searchLower);
+      }).toList();
+    }
+
+    setState(() {
+      filteredUsers = results;
+    });
+    _applySorting(); // Re-apply the current sort after filtering
+  }
+
+  Future<void> _executeBanUser(int userId) async {
+    try {
+      final res = await http.delete(Uri.parse('https://huramay-app.onrender.com/api/users/$userId'));
+      if (res.statusCode == 200) {
+        _fetchUsers();
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User banned permanently.")));
+      }
+    } catch (e) {
+      debugPrint("Ban error: $e");
+    }
+  }
+
+  void _showBanConfirmation(dynamic user) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text("Ban User?", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+        content: Text("Are you sure you want to permanently ban '${user['full_name']}' and remove all their items?"),
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF1A0088),
+              side: const BorderSide(color: Color(0xFF1A0088), width: 1.5),
+            ),
+            child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _executeBanUser(user['id']);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text("Ban User", style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1A0088),
+        title: const Text("Registered Users", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (c) => const AdminProfileScreen()));
+            },
+            icon: const Icon(Icons.account_circle, size: 30, color: Colors.white),
+          )
+        ],
+      ),
+      body: Column(
+        children: [
+          // 1. Search Bar & Controls Row
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: TextField(
+                      controller: _searchCtrl,
+                      onChanged: (value) => _runFilter(value),
+                      decoration: const InputDecoration(
+                        hintText: "Search name, email, or dept...",
+                        hintStyle: TextStyle(fontSize: 13),
+                        prefixIcon: Icon(Icons.search, size: 20, color: Colors.grey),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Total Count Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.yellow, 
+                    borderRadius: BorderRadius.circular(15)
+                  ),
+                  child: Text(
+                    "${filteredUsers.length}",
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black),
+                  ),
+                ),
+                // Sleek Sorting Menu
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.sort, color: Color(0xFF1A0088), size: 28),
+                  tooltip: "Sort Users",
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  onSelected: (String newValue) {
+                    setState(() {
+                      _currentSort = newValue;
+                    });
+                    _applySorting();
+                  },
+                  itemBuilder: (BuildContext context) => [
+                    PopupMenuItem(
+                      value: 'Name (A-Z)',
+                      child: Text('Name (A-Z)', style: TextStyle(fontWeight: _currentSort == 'Name (A-Z)' ? FontWeight.bold : FontWeight.normal, color: const Color(0xFF1A0088))),
+                    ),
+                    PopupMenuItem(
+                      value: 'Name (Z-A)',
+                      child: Text('Name (Z-A)', style: TextStyle(fontWeight: _currentSort == 'Name (Z-A)' ? FontWeight.bold : FontWeight.normal, color: const Color(0xFF1A0088))),
+                    ),
+                    PopupMenuItem(
+                      value: 'Department',
+                      child: Text('By Department', style: TextStyle(fontWeight: _currentSort == 'Department' ? FontWeight.bold : FontWeight.normal, color: const Color(0xFF1A0088))),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // 2. High-Density List View
+          Expanded(
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : filteredUsers.isEmpty
+                    ? const Center(child: Text("No users match your search.", style: TextStyle(color: Colors.grey)))
+                    : ListView.separated(
+                        itemCount: filteredUsers.length,
+                        separatorBuilder: (context, index) => const Divider(height: 1, color: Colors.black12),
+                        itemBuilder: (context, index) {
+                          final user = filteredUsers[index];
+                          
+                          String initials = user['full_name'].toString().isNotEmpty 
+                              ? user['full_name'].toString().substring(0, 1).toUpperCase() 
+                              : "?";
+
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                            tileColor: Colors.white,
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.blue.shade50,
+                              foregroundColor: const Color(0xFF1A0088),
+                              child: Text(initials, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                            title: Text(
+                              user['full_name'], 
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1A0088)),
+                              maxLines: 1, overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 2),
+                                Text(user['email'], style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                                Text(user['department'], style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis),
+                              ],
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.block, color: Colors.red, size: 22),
+                              onPressed: () => _showBanConfirmation(user),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(), 
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =========================================================================
+// 4. THE ADMIN REPORT OVERLAY DIALOG 
 // =========================================================================
 class AdminReportOverlay extends StatefulWidget {
   final dynamic itemData;
@@ -525,7 +831,7 @@ class _AdminReportOverlayState extends State<AdminReportOverlay> {
 }
 
 // =========================================================================
-// 3. ADMIN PROFILE SCREEN
+// 5. ADMIN PROFILE SCREEN
 // =========================================================================
 class AdminProfileScreen extends StatelessWidget {
   const AdminProfileScreen({super.key});
@@ -612,7 +918,7 @@ class AdminProfileScreen extends StatelessWidget {
 }
 
 // =========================================================================
-// 4. ADMIN MANAGEMENT SCREEN 
+// 6. ADMIN MANAGEMENT SCREEN 
 // =========================================================================
 class AdminManagementScreen extends StatefulWidget {
   const AdminManagementScreen({super.key});

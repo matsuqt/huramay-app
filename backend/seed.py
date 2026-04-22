@@ -33,7 +33,6 @@ def generate_fake_users(amount=200):
             'email': fake_email,
             'department': random.choice(DEPARTMENTS),
             'password': 'Password123!', # Standard password for all test accounts
-            'age': random.randint(18, 60) # Populating your custom age row
         }
         
         # Send the data to your live server
