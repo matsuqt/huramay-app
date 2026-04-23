@@ -66,49 +66,77 @@ class _AppSidebarState extends State<AppSidebar> {
       elevation: 0,
       child: Column(
         children: [
-          // 1. Modern Custom Header (Replaces the heavy blue block)
+          // 1. Modern Custom Branded Header 
           Container(
-            padding: const EdgeInsets.fromLTRB(24, 60, 24, 24),
+            padding: const EdgeInsets.fromLTRB(24, 50, 24, 24), // Slightly reduced top padding
             decoration: const BoxDecoration(
               color: Colors.white,
               border: Border(bottom: BorderSide(color: borderGrey, width: 1)),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: primaryBlue.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: primaryBlue.withOpacity(0.2), width: 1),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    initial,
-                    style: const TextStyle(fontSize: 24, color: primaryBlue, fontWeight: FontWeight.bold),
-                  ),
+                // --- THE BRAND LOCKUP (Logo + Text) ---
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.asset('assets/images/huramay_logo.png', height: 28), // Scaled down to not compete with avatar
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      "Huramay",
+                      style: TextStyle(
+                        fontSize: 22, 
+                        fontWeight: FontWeight.w900, 
+                        color: primaryBlue, 
+                        letterSpacing: -0.5
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        userName, 
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: textDark, letterSpacing: -0.5),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 32), // Deep breath of negative space
+                
+                // --- USER PROFILE ROW ---
+                Row(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: primaryBlue.withOpacity(0.08),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: primaryBlue.withOpacity(0.15), width: 1),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        currentUser?['department'] ?? "No Department",
-                        style: const TextStyle(fontSize: 12, color: textLight, fontWeight: FontWeight.w500),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      alignment: Alignment.center,
+                      child: Text(
+                        initial,
+                        style: const TextStyle(fontSize: 22, color: primaryBlue, fontWeight: FontWeight.bold),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            userName, 
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: textDark, letterSpacing: -0.3),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            currentUser?['department'] ?? "No Department",
+                            style: const TextStyle(fontSize: 12, color: textLight, fontWeight: FontWeight.w500),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

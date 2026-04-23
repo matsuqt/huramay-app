@@ -135,21 +135,16 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // 1. A slightly off-white/cool gray background so the white box pops
       backgroundColor: const Color(0xFFF8FAFC), 
       body: Stack(
         children: [
-          // 2. Creative Background Shapes (Subtle Geometry)
           Positioned(
             top: -100,
             right: -50,
             child: Container(
               width: 300,
               height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: primaryBlue.withOpacity(0.04), // Very subtle blue accent
-              ),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withOpacity(0.04)),
             ),
           ),
           Positioned(
@@ -158,14 +153,10 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Container(
               width: 200,
               height: 200,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: accentYellow.withOpacity(0.05), // Very subtle yellow accent
-              ),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: accentYellow.withOpacity(0.05)),
             ),
           ),
           
-          // 3. The Main Content
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
@@ -174,24 +165,26 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Header text floats outside the box
-                    const Text("Huramay", textAlign: TextAlign.center, style: TextStyle(fontSize: 40, color: primaryBlue, fontWeight: FontWeight.w900, letterSpacing: -1.0)),
+                    // --- NEW LOGO IMPLEMENTATION ---
+                    Center(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16), // Gives the logo smooth corners
+                        child: Image.asset('assets/images/huramay_logo.png', height: 90),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text("Huramay", textAlign: TextAlign.center, style: TextStyle(fontSize: 36, color: primaryBlue, fontWeight: FontWeight.w900, letterSpacing: -1.0)),
                     const SizedBox(height: 8),
                     const Text("Sign in to your account", textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: textLight)),
                     const SizedBox(height: 40),
                     
-                    // 4. The "Boxed" Login Form
                     Container(
                       padding: const EdgeInsets.all(32),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(24), // Smooth rounded corners
+                        borderRadius: BorderRadius.circular(24), 
                         boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.04), // Soft, modern drop shadow
-                            blurRadius: 24,
-                            offset: const Offset(0, 10),
-                          ),
+                          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 24, offset: const Offset(0, 10)),
                         ],
                         border: Border.all(color: Colors.grey.shade100, width: 1.5),
                       ),
@@ -245,7 +238,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 32),
                     
-                    // Footer link outside the box
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -340,6 +332,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // --- NEW LOGO IMPLEMENTATION ---
+              Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.asset('assets/images/huramay_logo.png', height: 70),
+                ),
+              ),
+              const SizedBox(height: 24),
               const Text("Create Account", style: TextStyle(fontSize: 32, color: primaryBlue, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
               const SizedBox(height: 8),
               const Text("Join Huramay to get started", style: TextStyle(fontSize: 16, color: textLight)),
@@ -370,7 +370,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   bool hasEmoji = RegExp(r'[\u00A9\u00AE\u2000-\u3300\ud83c\ud000-\ud83c\udfff\ud83d\ud000-\ud83d\udfff\ud83e\ud000-\ud83e\udfff]').hasMatch(v);
                   bool hasSpecialChars = v.contains(RegExp(r'[!#\$%^&*() \?":{}|<>]'));
                   if (hasEmoji || hasSpecialChars) return 'No special chars or emoji allowed';
-                  if (!v.toLowerCase().endsWith('@gmail.com')) return 'Must end with @gmail.com'; // Note: Kept your original logic
+                  if (!v.toLowerCase().endsWith('@gmail.com')) return 'Must end with @gmail.com'; 
                   return null;
                 },
               ),
