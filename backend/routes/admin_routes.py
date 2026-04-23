@@ -25,23 +25,18 @@ def create_admin():
     email_input = data.get('email', '')
     password_input = data.get('password', '')
     
-    # 1. Full Name Validation: Only letters, spaces, and periods (.) - NO emojis.
     if not re.match(r'^[a-zA-Z\s.]+$', full_name_input):
         return jsonify({"message": "Full name can only contain letters, spaces, and periods."}), 400
 
-    # 2. Email Validation: Must end in @gmail.com and have no emojis/special characters
     if not re.match(r'^[a-zA-Z0-9._]+@gmail\.com$', email_input):
         return jsonify({"message": "Email must be a valid @gmail.com address without emojis."}), 400
         
-    # 3. Password Validation: Block non-ASCII characters (Emojis)
     if re.search(r'[^\x00-\x7F]', password_input):
         return jsonify({"message": "Password cannot contain emojis."}), 400
 
-    # 4. Check if email already exists
     if User.query.filter_by(email=email_input).first():
         return jsonify({"message": "Email already registered"}), 400
     
-    # If all checks pass, create the admin!
     hashed_pass = bcrypt.generate_password_hash(password_input).decode('utf-8')
     new_admin = User(
         full_name=full_name_input, 
@@ -67,13 +62,14 @@ def delete_admin(admin_id):
     db.session.commit()
     return jsonify({"message": "Admin deleted successfully"}), 200
 
+# --- THE BAN FUNCTION (Kept as is for soft moderation) ---
 @admin_bp.route('/api/users/<int:user_id>', methods=['DELETE'])
 def ban_user(user_id):
     user = User.query.get(user_id)
     if not user:
         return jsonify({"message": "User not found"}), 404
     
-    if user.email == 'admin@gmail.com':
+    if user.email == 'admin@gmail.com' or getattr(user, 'is_admin', False):
         return jsonify({"message": "Access Denied"}), 403
         
     try:
@@ -85,15 +81,35 @@ def ban_user(user_id):
         db.session.rollback()
         return jsonify({"message": "Error banning user", "error": str(e)}), 500
 
-# ==========================================
-# NEW ROUTE: Fetch all standard users
-# ==========================================
+# --- THE NEW HARD DELETE FUNCTION (VAVT-88) ---
+@admin_bp.route('/api/users/<int:user_id>/hard_delete', methods=['DELETE'])
+def hard_delete_user(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+    
+    if user.email == 'admin@gmail.com' or getattr(user, 'is_admin', False):
+        return jsonify({"message": "Access Denied"}), 403
+        
+    try:
+        # THE ARMOR: Check if the user is involved in an active transaction
+        active_items = Item.query.filter_by(user_id=user_id, status='Borrowed').first()
+        if active_items:
+            return jsonify({"message": "Cannot delete: User has active borrowed items."}), 400
+            
+        # Execute Cascading Delete
+        Item.query.filter_by(user_id=user_id).delete()
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({"message": "User permanently wiped from system."}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"message": "Error deleting user", "error": str(e)}), 500
+
 @admin_bp.route('/api/users', methods=['GET'])
 def get_all_users():
     try:
-        # Fetch all standard users (exclude admins)
         users = User.query.filter((User.is_admin == False) | (User.is_admin == None)).all()
-        
         user_list = []
         for user in users:
             user_list.append({
@@ -102,9 +118,8 @@ def get_all_users():
                 "email": user.email,
                 "department": user.department,
                 "rating": user.rating,
-                "age": getattr(user, 'age', 'N/A') # Grabs your custom age requirement!
+                "age": getattr(user, 'age', 'N/A')
             })
-            
         return jsonify(user_list), 200
     except Exception as e:
         return jsonify({"message": f"Server Error: {str(e)}"}), 500
