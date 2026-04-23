@@ -892,14 +892,57 @@ class _EditItemScreenState extends State<EditItemScreen> {
   }
 
   Future<void> _updateItem() async {
+    final titleText = _titleCtrl.text.trim();
+    final descText = _descCtrl.text.trim();
+
+    // VAVT-85 Validation: Reject Emojis and Special Characters in Name
+    if (!RegExp(r'^[a-zA-Z0-9\s]+$').hasMatch(titleText)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: const [
+              Icon(Icons.error_outline, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(child: Text("Item name cannot contain emojis or special characters.", style: TextStyle(fontWeight: FontWeight.w600))),
+            ],
+          ),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(20),
+        ),
+      );
+      return; 
+    }
+
+    // VAVT-86 Validation: Reject Emojis/Special Chars in Description (Allowing '.' and ',')
+    if (!RegExp(r'^[a-zA-Z0-9\s.,]+$').hasMatch(descText)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: const [
+              Icon(Icons.error_outline, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(child: Text("Description cannot contain emojis or special characters (only periods and commas allowed).", style: TextStyle(fontWeight: FontWeight.w600))),
+            ],
+          ),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(20),
+        ),
+      );
+      return; 
+    }
+
     setState(() => _isUpdating = true);
     try {
       await http.put(
         Uri.parse('https://huramay-app.onrender.com/api/items/${widget.item['id']}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'title': _titleCtrl.text,
-          'description': _descCtrl.text,
+          'title': titleText,
+          'description': descText,
           'condition': _selectedCondition,
           'status': _selectedStatus,
           'department': _selectedDept,
@@ -1038,15 +1081,59 @@ class _AddItemScreenState extends State<AddItemScreen> {
   }
 
   Future<void> _postItem() async {
-    if (_titleCtrl.text.isEmpty || _descCtrl.text.isEmpty || _selectedCondition == null) return;
+    final titleText = _titleCtrl.text.trim();
+    final descText = _descCtrl.text.trim();
+    
+    if (titleText.isEmpty || descText.isEmpty || _selectedCondition == null) return;
+
+    // VAVT-85 Validation: Reject Emojis and Special Characters in Name
+    if (!RegExp(r'^[a-zA-Z0-9\s]+$').hasMatch(titleText)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: const [
+              Icon(Icons.error_outline, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(child: Text("Item name cannot contain emojis or special characters.", style: TextStyle(fontWeight: FontWeight.w600))),
+            ],
+          ),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(20),
+        ),
+      );
+      return; 
+    }
+
+    // VAVT-86 Validation: Reject Emojis/Special Chars in Description (Allowing '.' and ',')
+    if (!RegExp(r'^[a-zA-Z0-9\s.,]+$').hasMatch(descText)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: const [
+              Icon(Icons.error_outline, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(child: Text("Description cannot contain emojis or special characters (only periods and commas allowed).", style: TextStyle(fontWeight: FontWeight.w600))),
+            ],
+          ),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(20),
+        ),
+      );
+      return; 
+    }
+
     setState(() => _isPosting = true);
     try {
       final res = await http.post(
         Uri.parse('https://huramay-app.onrender.com/api/items'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'title': _titleCtrl.text,
-          'description': _descCtrl.text,
+          'title': titleText,
+          'description': descText,
           'quantity': _qtyCtrl.text.isEmpty ? "1" : _qtyCtrl.text,
           'condition': _selectedCondition,
           'item_image_path': _itemPhotoPath ?? "",
