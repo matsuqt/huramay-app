@@ -93,6 +93,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // VAVT-84: Check for user profile image
+    String? photoBase64 = currentUser?['photo_path'];
+    bool hasPhoto = photoBase64 != null && photoBase64.isNotEmpty;
+
     return Scaffold(
       backgroundColor: bgGray,
       appBar: AppBar(
@@ -120,14 +124,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         actions: [
-          IconButton(
-            onPressed: () => Navigator.push(
+          // VAVT-84: Dynamic Profile Picture Button
+          GestureDetector(
+            onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (c) => const ProfileScreen()),
             ),
-            icon: const Icon(Icons.account_circle_outlined, size: 28, color: textDark),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10.0),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: primaryBlue.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: borderGrey, width: 1),
+                  image: hasPhoto 
+                    ? DecorationImage(image: MemoryImage(base64Decode(photoBase64!)), fit: BoxFit.cover) 
+                    : null,
+                ),
+                child: !hasPhoto 
+                  ? const Icon(Icons.person_outline, size: 20, color: textDark) 
+                  : null,
+              ),
+            ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 16),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
@@ -135,10 +157,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
       drawer: const AppSidebar(),
-      // Use a Stack to layer the background shapes behind the content
       body: Stack(
         children: [
-          // Subtle Blue Accent (Top Right)
           Positioned(
             top: -80,
             right: -60,
@@ -151,7 +171,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           ),
-          // Subtle Yellow Accent (Bottom Left)
           Positioned(
             bottom: 100,
             left: -80,
@@ -165,7 +184,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           
-          // Main Dashboard Content
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
