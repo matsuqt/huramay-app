@@ -3,6 +3,7 @@ from flask import Blueprint, request, jsonify
 from database import db, bcrypt
 from models.user import User
 from models.item import Item
+from models.borrow_request import BorrowRequest
 import re
 
 # Create the Blueprint
@@ -62,7 +63,6 @@ def delete_admin(admin_id):
     db.session.commit()
     return jsonify({"message": "Admin deleted successfully"}), 200
 
-# --- THE BAN FUNCTION (Kept as is for soft moderation) ---
 @admin_bp.route('/api/users/<int:user_id>', methods=['DELETE'])
 def ban_user(user_id):
     user = User.query.get(user_id)
@@ -81,7 +81,8 @@ def ban_user(user_id):
         db.session.rollback()
         return jsonify({"message": "Error banning user", "error": str(e)}), 500
 
-# --- THE NEW HARD DELETE FUNCTION (VAVT-88) ---
+
+# --- THE UPGRADED TWO-WAY ARMOR ---
 @admin_bp.route('/api/users/<int:user_id>/hard_delete', methods=['DELETE'])
 def hard_delete_user(user_id):
     user = User.query.get(user_id)
@@ -92,19 +93,30 @@ def hard_delete_user(user_id):
         return jsonify({"message": "Access Denied"}), 403
         
     try:
-        # THE ARMOR: Check if the user is involved in an active transaction
-        active_items = Item.query.filter_by(user_id=user_id, status='Borrowed').first()
-        if active_items:
-            return jsonify({"message": "Cannot delete: User has active borrowed items."}), 400
+        # ARMOR CHECK 1: The Lender (Do they own an item currently being borrowed?)
+        active_lending = Item.query.filter_by(user_id=user_id, status='Borrowed').first()
+        if active_lending:
+            return jsonify({"message": "Cannot delete: User owns an item that is currently borrowed out."}), 400
             
-        # Execute Cascading Delete
-        Item.query.filter_by(user_id=user_id).delete()
-        db.session.delete(user)
+        # ARMOR CHECK 2: The Borrower (Are they actively borrowing someone else's item?)
+        active_borrowing = BorrowRequest.query.filter(
+            BorrowRequest.borrower_id == user_id,
+            BorrowRequest.status.in_(['Pending', 'Approved', 'Borrowed'])
+        ).first()
+        if active_borrowing:
+            return jsonify({"message": "Cannot delete: User is currently involved in an active borrow request."}), 400
+            
+        # SAFE ZONE: Execute Deep Cascading Cleanup
+        BorrowRequest.query.filter_by(borrower_id=user_id).delete() # Wipe request history
+        Item.query.filter_by(user_id=user_id).delete()              # Wipe uploaded items
+        db.session.delete(user)                                     # Wipe the user
         db.session.commit()
+        
         return jsonify({"message": "User permanently wiped from system."}), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({"message": "Error deleting user", "error": str(e)}), 500
+
 
 @admin_bp.route('/api/users', methods=['GET'])
 def get_all_users():
