@@ -205,7 +205,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             TextFormField(
                               controller: _emailCtrl,
                               style: const TextStyle(color: textDark, fontWeight: FontWeight.w500),
-                              decoration: modernInputDecoration("name@student.lnu.edu.ph"),
+                              decoration: modernInputDecoration("@gmail.com"),
                               validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                             ),
                             const SizedBox(height: 20),
@@ -359,12 +359,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
               ),
               const SizedBox(height: 20),
 
-              const Text("LNU Email", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+              const Text("Email", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
               const SizedBox(height: 8),
               TextFormField(
                 controller: _emailCtrl,
                 style: const TextStyle(color: textDark, fontWeight: FontWeight.w500),
-                decoration: modernInputDecoration("name@student.lnu.edu.ph"),
+                decoration: modernInputDecoration("@gmail.com"),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Required';
                   bool hasEmoji = RegExp(r'[\u00A9\u00AE\u2000-\u3300\ud83c\ud000-\ud83c\udfff\ud83d\ud000-\ud83d\udfff\ud83e\ud000-\ud83e\udfff]').hasMatch(v);
