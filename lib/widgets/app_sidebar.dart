@@ -60,6 +60,10 @@ class _AppSidebarState extends State<AppSidebar> {
     
     String userName = currentUser?['full_name'] ?? "User";
     String initial = userName.isNotEmpty ? userName[0].toUpperCase() : "U";
+    
+    // VAVT-84: Check for user profile image
+    String? photoBase64 = currentUser?['photo_path'];
+    bool hasPhoto = photoBase64 != null && photoBase64.isNotEmpty;
 
     return Drawer(
       backgroundColor: bgGray, 
@@ -68,7 +72,7 @@ class _AppSidebarState extends State<AppSidebar> {
         children: [
           // 1. Modern Custom Branded Header 
           Container(
-            padding: const EdgeInsets.fromLTRB(24, 50, 24, 24), // Slightly reduced top padding
+            padding: const EdgeInsets.fromLTRB(24, 50, 24, 24), 
             decoration: const BoxDecoration(
               color: Colors.white,
               border: Border(bottom: BorderSide(color: borderGrey, width: 1)),
@@ -82,7 +86,7 @@ class _AppSidebarState extends State<AppSidebar> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(6),
-                      child: Image.asset('assets/images/huramay_logo.png', height: 28), // Scaled down to not compete with avatar
+                      child: Image.asset('assets/images/huramay_logo.png', height: 28), 
                     ),
                     const SizedBox(width: 10),
                     const Text(
@@ -96,7 +100,7 @@ class _AppSidebarState extends State<AppSidebar> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 32), // Deep breath of negative space
+                const SizedBox(height: 32), 
                 
                 // --- USER PROFILE ROW ---
                 Row(
@@ -108,12 +112,17 @@ class _AppSidebarState extends State<AppSidebar> {
                         color: primaryBlue.withOpacity(0.08),
                         shape: BoxShape.circle,
                         border: Border.all(color: primaryBlue.withOpacity(0.15), width: 1),
+                        // VAVT-84: Apply the image if it exists
+                        image: hasPhoto 
+                          ? DecorationImage(image: MemoryImage(base64Decode(photoBase64)), fit: BoxFit.cover) 
+                          : null,
                       ),
                       alignment: Alignment.center,
-                      child: Text(
+                      // Hide the text initial if we have a photo
+                      child: !hasPhoto ? Text(
                         initial,
                         style: const TextStyle(fontSize: 22, color: primaryBlue, fontWeight: FontWeight.bold),
-                      ),
+                      ) : null,
                     ),
                     const SizedBox(width: 16),
                     Expanded(

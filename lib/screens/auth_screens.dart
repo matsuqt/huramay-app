@@ -468,7 +468,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _pickImage() async {
-    final image = await ImagePicker().pickImage(source: ImageSource.gallery);
+    // VAVT-87: Compress the image instantly when the user picks it
+    final image = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 20, // Compresses the file size by 80%
+      maxWidth: 400,    // Shrinks the dimensions so it isn't 4K
+      maxHeight: 400,
+    );
+    
     if (image != null) {
       final bytes = await File(image.path).readAsBytes();
       setState(() {

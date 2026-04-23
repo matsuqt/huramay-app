@@ -50,3 +50,38 @@ def login():
             "message": "Login successful!"
         }), 200
     return jsonify({"message": "Invalid email or password"}), 401
+
+@auth_bp.route('/api/user/update', methods=['POST'])
+def update_profile():
+    try:
+        data = request.get_json()
+        user_id = data.get('id')
+        
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({"message": "User not found"}), 404
+            
+        user.photo_path = data.get('photo_path', '')
+        db.session.commit()
+        
+        return jsonify({"message": "Profile updated successfully!"}), 200
+    except Exception as e:
+        return jsonify({"message": f"Server Error: {str(e)}"}), 500
+
+@auth_bp.route('/api/user/reset_password', methods=['POST'])
+def reset_password():
+    try:
+        data = request.get_json()
+        user = User.query.get(data.get('current_user_id'))
+        
+        if not user or user.email != data.get('email'):
+            return jsonify({"message": "Invalid user or email"}), 400
+            
+        # Hash the new password and save it
+        hashed_pass = bcrypt.generate_password_hash(data.get('new_password')).decode('utf-8')
+        user.password = hashed_pass
+        db.session.commit()
+        
+        return jsonify({"message": "Password updated successfully"}), 200
+    except Exception as e:
+        return jsonify({"message": f"Server Error: {str(e)}"}), 500
