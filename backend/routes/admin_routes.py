@@ -1,4 +1,6 @@
 # backend/routes/admin_routes.py
+from models.favorite import Favorite
+from models.report_item import ReportItem
 from flask import Blueprint, request, jsonify
 from database import db, bcrypt
 from models.user import User
@@ -73,6 +75,10 @@ def ban_user(user_id):
         return jsonify({"message": "Access Denied"}), 403
         
     try:
+        # Added Deep Clean here to prevent crashes if the ban button is used
+        Favorite.query.filter_by(user_id=user_id).delete()          
+        ReportItem.query.filter_by(reporter_id=user_id).delete()    
+        BorrowRequest.query.filter_by(borrower_id=user_id).delete() 
         Item.query.filter_by(user_id=user_id).delete()
         db.session.delete(user)
         db.session.commit()
@@ -114,6 +120,8 @@ def hard_delete_user(user_id):
             return jsonify({"message": f"Cannot delete: User is actively borrowing (Status: {active_borrowing.status})."}), 400
             
         # SAFE ZONE: Execute Deep Cascading Cleanup
+        Favorite.query.filter_by(user_id=user_id).delete()          # Wipe favorites
+        ReportItem.query.filter_by(reporter_id=user_id).delete()    # Wipe submitted reports
         BorrowRequest.query.filter_by(borrower_id=user_id).delete() # Wipe request history
         Item.query.filter_by(user_id=user_id).delete()              # Wipe uploaded items
         db.session.delete(user)                                     # Wipe the user
