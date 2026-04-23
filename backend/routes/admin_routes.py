@@ -93,18 +93,25 @@ def hard_delete_user(user_id):
         return jsonify({"message": "Access Denied"}), 403
         
     try:
-        # ARMOR CHECK 1: The Lender (Do they own an item currently being borrowed?)
-        active_lending = Item.query.filter_by(user_id=user_id, status='Borrowed').first()
+        # ARMOR CHECK 1: The Lender (Case-Insensitive)
+        active_lending = Item.query.filter(
+            Item.user_id == user_id,
+            db.func.lower(Item.status) == 'borrowed'
+        ).first()
+        
         if active_lending:
             return jsonify({"message": "Cannot delete: User owns an item that is currently borrowed out."}), 400
             
-        # ARMOR CHECK 2: The Borrower (Are they actively borrowing someone else's item?)
+        # ARMOR CHECK 2: The Borrower (Case-Insensitive + Expanded Status List)
         active_borrowing = BorrowRequest.query.filter(
             BorrowRequest.borrower_id == user_id,
-            BorrowRequest.status.in_(['Pending', 'Approved', 'Borrowed'])
+            db.func.lower(BorrowRequest.status).in_([
+                'pending', 'approved', 'borrowed', 'accepted', 'active', 'ongoing'
+            ])
         ).first()
+        
         if active_borrowing:
-            return jsonify({"message": "Cannot delete: User is currently involved in an active borrow request."}), 400
+            return jsonify({"message": f"Cannot delete: User is actively borrowing (Status: {active_borrowing.status})."}), 400
             
         # SAFE ZONE: Execute Deep Cascading Cleanup
         BorrowRequest.query.filter_by(borrower_id=user_id).delete() # Wipe request history
@@ -116,7 +123,6 @@ def hard_delete_user(user_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"message": "Error deleting user", "error": str(e)}), 500
-
 
 @admin_bp.route('/api/users', methods=['GET'])
 def get_all_users():
