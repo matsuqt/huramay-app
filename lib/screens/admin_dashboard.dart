@@ -15,6 +15,16 @@ const Color textLight = Color(0xFF6B7280);
 const Color borderGrey = Color(0xFFE5E7EB);
 const Color bgGray = Color(0xFFF8FAFC);
 
+// --- THE SAFETY NET (VAVT-87) ---
+ImageProvider? _getSafeImage(String? base64Str) {
+  if (base64Str == null || base64Str.isEmpty || base64Str.length < 100) return null;
+  try {
+    return MemoryImage(base64Decode(base64Str));
+  } catch (e) {
+    return null; // Fallback to safe icon if the image is poisoned/local path
+  }
+}
+
 // =========================================================================
 // 1. ADMIN DASHBOARD WRAPPER (BOTTOM NAV BAR)
 // =========================================================================
@@ -281,8 +291,8 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
   }
 
   Widget _buildAdminCard(dynamic item) {
-    String? imgPath = item['image'];
-    bool hasImage = imgPath != null && imgPath.isNotEmpty;
+    // VAVT-87: Apply the safety net here
+    ImageProvider? safeImg = _getSafeImage(item['image']);
     bool isFlagged = item['status']?.toString().toLowerCase() == 'flagged';
 
     return GestureDetector(
@@ -306,12 +316,13 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
                 color: bgGray,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: isFlagged ? Colors.red.shade300 : borderGrey, width: 1),
-                image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
+                // VAVT-87: Display the decoded image safely
+                image: safeImg != null ? DecorationImage(image: safeImg, fit: BoxFit.cover) : null,
               ),
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  if (!hasImage) const Icon(Icons.image_outlined, size: 32, color: textLight),
+                  if (safeImg == null) const Icon(Icons.image_outlined, size: 32, color: textLight),
                   if (isFlagged)
                     Container(
                       width: double.infinity, height: double.infinity,
@@ -897,8 +908,9 @@ class _AdminReportOverlayState extends State<AdminReportOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    String? imgPath = widget.itemData['image'];
-    bool hasImage = imgPath != null && imgPath.isNotEmpty;
+    // VAVT-87: Apply the safety net here too
+    ImageProvider? safeImg = _getSafeImage(widget.itemData['image']);
+    bool hasImage = safeImg != null;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -936,7 +948,8 @@ class _AdminReportOverlayState extends State<AdminReportOverlay> {
                 color: bgGray,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: borderGrey, width: 1),
-                image: hasImage ? DecorationImage(image: FileImage(File(imgPath)), fit: BoxFit.cover) : null,
+                // VAVT-87: Display safely
+                image: hasImage ? DecorationImage(image: safeImg, fit: BoxFit.cover) : null,
               ),
               child: !hasImage ? const Icon(Icons.image_outlined, size: 40, color: textLight) : null,
             ),

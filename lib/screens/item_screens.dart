@@ -19,6 +19,17 @@ const Color textLight = Color(0xFF6B7280);
 const Color borderGrey = Color(0xFFE5E7EB);
 const Color bgGray = Color(0xFFF8FAFC);
 
+// ==================== SAFETY NET HELPER ====================
+// VAVT-87: This prevents the app from crashing if a bad image path gets into the database
+ImageProvider? getSafeImage(String? base64Str) {
+  if (base64Str == null || base64Str.isEmpty || base64Str.length < 100) return null;
+  try {
+    return MemoryImage(base64Decode(base64Str));
+  } catch (e) {
+    return null; // Fallback to empty icon if decoding fails
+  }
+}
+
 // ==================== DEPARTMENT SCREEN ====================
 class DepartmentScreen extends StatefulWidget {
   const DepartmentScreen({super.key});
@@ -210,8 +221,7 @@ class _DeptItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String? imgPath = item['image']; 
-    bool hasImage = imgPath != null && imgPath.isNotEmpty;
+    ImageProvider? safeImg = getSafeImage(item['image']);
     bool isAvailable = item['status']?.toString().toLowerCase() == 'available';
 
     return GestureDetector(
@@ -232,9 +242,9 @@ class _DeptItemCard extends StatelessWidget {
               width: 80, height: 80,
               decoration: BoxDecoration(
                 color: bgGray, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderGrey),
-                image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
+                image: safeImg != null ? DecorationImage(image: safeImg, fit: BoxFit.cover) : null,
               ),
-              child: !hasImage ? const Icon(Icons.image_outlined, size: 32, color: textLight) : null,
+              child: safeImg == null ? const Icon(Icons.image_outlined, size: 32, color: textLight) : null,
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -375,8 +385,7 @@ class _FavoriteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String? imgPath = item['image'];
-    bool hasImage = imgPath != null && imgPath.isNotEmpty;
+    ImageProvider? safeImg = getSafeImage(item['image']);
     bool isAvailable = item['status']?.toString().toLowerCase() == 'available';
 
     return GestureDetector(
@@ -395,9 +404,9 @@ class _FavoriteCard extends StatelessWidget {
               width: 80, height: 80,
               decoration: BoxDecoration(
                 color: bgGray, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderGrey),
-                image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
+                image: safeImg != null ? DecorationImage(image: safeImg, fit: BoxFit.cover) : null,
               ),
-              child: !hasImage ? const Icon(Icons.image_outlined, size: 32, color: textLight) : null,
+              child: safeImg == null ? const Icon(Icons.image_outlined, size: 32, color: textLight) : null,
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -482,8 +491,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
 
   @override
   Widget build(BuildContext context) {
-    String? imgPath = widget.item['image'];
-    bool hasImage = imgPath != null && imgPath.isNotEmpty;
+    ImageProvider? safeImg = getSafeImage(widget.item['image']);
     bool isAvailable = widget.item['status']?.toString().toLowerCase() == 'available';
 
     return Scaffold(
@@ -512,10 +520,10 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(color: borderGrey, width: 1),
-                      image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
+                      image: safeImg != null ? DecorationImage(image: safeImg, fit: BoxFit.cover) : null,
                       boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 10))],
                     ),
-                    child: !hasImage ? const Icon(Icons.image_outlined, size: 64, color: textLight) : null,
+                    child: safeImg == null ? const Icon(Icons.image_outlined, size: 64, color: textLight) : null,
                   ),
                   Positioned(
                     bottom: -15, right: -15,
@@ -749,8 +757,7 @@ class _MyItemCardState extends State<_MyItemCard> {
 
   @override
   Widget build(BuildContext context) {
-    String? imgPath = widget.item['image'];
-    bool hasImage = imgPath != null && imgPath.isNotEmpty;
+    ImageProvider? safeImg = getSafeImage(widget.item['image']);
     bool isAvailable = widget.item['status']?.toString().toLowerCase() == 'available';
 
     return Column(
@@ -769,9 +776,9 @@ class _MyItemCardState extends State<_MyItemCard> {
                 width: 80, height: 80,
                 decoration: BoxDecoration(
                   color: bgGray, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderGrey),
-                  image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
+                  image: safeImg != null ? DecorationImage(image: safeImg, fit: BoxFit.cover) : null,
                 ),
-                child: !hasImage ? const Icon(Icons.image_outlined, size: 32, color: textLight) : null,
+                child: safeImg == null ? const Icon(Icons.image_outlined, size: 32, color: textLight) : null,
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -886,52 +893,26 @@ class _EditItemScreenState extends State<EditItemScreen> {
     if (_itemPhotoPath != null && _itemPhotoPath!.isEmpty) _itemPhotoPath = null;
   }
 
+  // VAVT-87: Compress and Convert to Base64 instantly
   Future<void> _pickImage() async {
-    final image = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (image != null) setState(() => _itemPhotoPath = image.path);
+    final image = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 20);
+    if (image != null) {
+      final bytes = await File(image.path).readAsBytes();
+      setState(() => _itemPhotoPath = base64Encode(bytes));
+    }
   }
 
   Future<void> _updateItem() async {
     final titleText = _titleCtrl.text.trim();
     final descText = _descCtrl.text.trim();
 
-    // VAVT-85 Validation: Reject Emojis and Special Characters in Name
     if (!RegExp(r'^[a-zA-Z0-9\s]+$').hasMatch(titleText)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: const [
-              Icon(Icons.error_outline, color: Colors.white),
-              SizedBox(width: 12),
-              Expanded(child: Text("Item name cannot contain emojis or special characters.", style: TextStyle(fontWeight: FontWeight.w600))),
-            ],
-          ),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.all(20),
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Row(children: const [Icon(Icons.error_outline, color: Colors.white), SizedBox(width: 12), Expanded(child: Text("Item name cannot contain emojis or special characters.", style: TextStyle(fontWeight: FontWeight.w600)))],), backgroundColor: Colors.red.shade700, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), margin: const EdgeInsets.all(20)));
       return; 
     }
 
-    // VAVT-86 Validation: Reject Emojis/Special Chars in Description (Allowing '.' and ',')
     if (!RegExp(r'^[a-zA-Z0-9\s.,]+$').hasMatch(descText)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: const [
-              Icon(Icons.error_outline, color: Colors.white),
-              SizedBox(width: 12),
-              Expanded(child: Text("Description cannot contain emojis or special characters (only periods and commas allowed).", style: TextStyle(fontWeight: FontWeight.w600))),
-            ],
-          ),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.all(20),
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Row(children: const [Icon(Icons.error_outline, color: Colors.white), SizedBox(width: 12), Expanded(child: Text("Description cannot contain emojis or special characters (only periods and commas allowed).", style: TextStyle(fontWeight: FontWeight.w600)))],), backgroundColor: Colors.red.shade700, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), margin: const EdgeInsets.all(20)));
       return; 
     }
 
@@ -957,6 +938,8 @@ class _EditItemScreenState extends State<EditItemScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ImageProvider? safeImg = getSafeImage(_itemPhotoPath);
+
     return Scaffold(
       backgroundColor: Colors.white, 
       appBar: AppBar(
@@ -980,9 +963,9 @@ class _EditItemScreenState extends State<EditItemScreen> {
                   width: double.infinity, height: 180,
                   decoration: BoxDecoration(
                     color: bgGray, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderGrey, width: 2),
-                    image: _itemPhotoPath != null ? DecorationImage(image: FileImage(File(_itemPhotoPath!)), fit: BoxFit.cover) : null,
+                    image: safeImg != null ? DecorationImage(image: safeImg, fit: BoxFit.cover) : null,
                   ),
-                  child: _itemPhotoPath == null 
+                  child: safeImg == null 
                     ? Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: const [
@@ -1075,9 +1058,13 @@ class _AddItemScreenState extends State<AddItemScreen> {
   bool _isPosting = false;
   final List<String> _conditions = ['New', 'Like New', 'Good', 'Fair', 'Poor'];
 
+  // VAVT-87: Compress and Convert to Base64 instantly
   Future<void> _pickItemImage() async {
-    final image = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (image != null) setState(() => _itemPhotoPath = image.path);
+    final image = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 20);
+    if (image != null) {
+      final bytes = await File(image.path).readAsBytes();
+      setState(() => _itemPhotoPath = base64Encode(bytes));
+    }
   }
 
   Future<void> _postItem() async {
@@ -1086,43 +1073,13 @@ class _AddItemScreenState extends State<AddItemScreen> {
     
     if (titleText.isEmpty || descText.isEmpty || _selectedCondition == null) return;
 
-    // VAVT-85 Validation: Reject Emojis and Special Characters in Name
     if (!RegExp(r'^[a-zA-Z0-9\s]+$').hasMatch(titleText)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: const [
-              Icon(Icons.error_outline, color: Colors.white),
-              SizedBox(width: 12),
-              Expanded(child: Text("Item name cannot contain emojis or special characters.", style: TextStyle(fontWeight: FontWeight.w600))),
-            ],
-          ),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.all(20),
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Row(children: const [Icon(Icons.error_outline, color: Colors.white), SizedBox(width: 12), Expanded(child: Text("Item name cannot contain emojis or special characters.", style: TextStyle(fontWeight: FontWeight.w600)))],), backgroundColor: Colors.red.shade700, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), margin: const EdgeInsets.all(20)));
       return; 
     }
 
-    // VAVT-86 Validation: Reject Emojis/Special Chars in Description (Allowing '.' and ',')
     if (!RegExp(r'^[a-zA-Z0-9\s.,]+$').hasMatch(descText)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: const [
-              Icon(Icons.error_outline, color: Colors.white),
-              SizedBox(width: 12),
-              Expanded(child: Text("Description cannot contain emojis or special characters (only periods and commas allowed).", style: TextStyle(fontWeight: FontWeight.w600))),
-            ],
-          ),
-          backgroundColor: Colors.red.shade700,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.all(20),
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Row(children: const [Icon(Icons.error_outline, color: Colors.white), SizedBox(width: 12), Expanded(child: Text("Description cannot contain emojis or special characters (only periods and commas allowed).", style: TextStyle(fontWeight: FontWeight.w600)))],), backgroundColor: Colors.red.shade700, behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), margin: const EdgeInsets.all(20)));
       return; 
     }
 
@@ -1150,6 +1107,8 @@ class _AddItemScreenState extends State<AddItemScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ImageProvider? safeImg = getSafeImage(_itemPhotoPath);
+
     return Scaffold(
       backgroundColor: Colors.white, 
       appBar: AppBar(
@@ -1173,9 +1132,9 @@ class _AddItemScreenState extends State<AddItemScreen> {
                   width: double.infinity, height: 180,
                   decoration: BoxDecoration(
                     color: bgGray, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderGrey, width: 2),
-                    image: _itemPhotoPath != null ? DecorationImage(image: FileImage(File(_itemPhotoPath!)), fit: BoxFit.cover) : null,
+                    image: safeImg != null ? DecorationImage(image: safeImg, fit: BoxFit.cover) : null,
                   ),
-                  child: _itemPhotoPath == null 
+                  child: safeImg == null 
                     ? Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: const [

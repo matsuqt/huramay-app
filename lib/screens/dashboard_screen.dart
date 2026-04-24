@@ -39,6 +39,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _setupFCMToken(); 
   }
 
+  // --- THE SAFETY NET (VAVT-87) ---
+  ImageProvider? _getSafeImage(String? base64Str) {
+    if (base64Str == null || base64Str.isEmpty || base64Str.length < 100) return null;
+    try {
+      return MemoryImage(base64Decode(base64Str));
+    } catch (e) {
+      return null; // Fallback to safe icon if the image is poisoned/local path
+    }
+  }
+
   Future<void> _setupFCMToken() async {
     try {
       FirebaseMessaging messaging = FirebaseMessaging.instance;
@@ -93,9 +103,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // VAVT-84: Check for user profile image
-    String? photoBase64 = currentUser?['photo_path'];
-    bool hasPhoto = photoBase64 != null && photoBase64.isNotEmpty;
+    // VAVT-87: Apply safety net to the user's profile picture
+    ImageProvider? profileImg = _getSafeImage(currentUser?['photo_path']);
 
     return Scaffold(
       backgroundColor: bgGray,
@@ -124,7 +133,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         actions: [
-          // VAVT-84: Dynamic Profile Picture Button
+          // Dynamic Profile Picture Button
           GestureDetector(
             onTap: () => Navigator.push(
               context,
@@ -139,11 +148,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   color: primaryBlue.withOpacity(0.1),
                   shape: BoxShape.circle,
                   border: Border.all(color: borderGrey, width: 1),
-                  image: hasPhoto 
-                    ? DecorationImage(image: MemoryImage(base64Decode(photoBase64!)), fit: BoxFit.cover) 
+                  image: profileImg != null 
+                    ? DecorationImage(image: profileImg, fit: BoxFit.cover) 
                     : null,
                 ),
-                child: !hasPhoto 
+                child: profileImg == null 
                   ? const Icon(Icons.person_outline, size: 20, color: textDark) 
                   : null,
               ),
@@ -304,8 +313,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _itemCard(BuildContext context, dynamic item) {
-    String? imgPath = item['image'];
-    bool hasImage = imgPath != null && imgPath.isNotEmpty;
+    // VAVT-87: Apply the safety net here
+    ImageProvider? safeImg = _getSafeImage(item['image']);
     bool isAvailable = item['status']?.toString().toLowerCase() == 'available';
 
     return GestureDetector(
@@ -341,11 +350,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 color: bgGray,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: borderGrey, width: 1), 
-                image: hasImage 
-                  ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) 
+                // VAVT-87: Display safely
+                image: safeImg != null 
+                  ? DecorationImage(image: safeImg, fit: BoxFit.cover) 
                   : null,
               ),
-              child: !hasImage ? const Icon(Icons.image_outlined, size: 32, color: textLight) : null,
+              child: safeImg == null ? const Icon(Icons.image_outlined, size: 32, color: textLight) : null,
             ),
             const SizedBox(width: 16),
             
