@@ -3,11 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
+import 'package:firebase_messaging/firebase_messaging.dart'; 
 
 import '../widgets/app_sidebar.dart';
-import '../utils/ui_helpers.dart';
 import 'auth_screens.dart';
 import 'item_screens.dart';
+import '../globals.dart'; 
+
+// ==================== SHARED DESIGN CONSTANTS ====================
+const Color primaryBlue = Color(0xFF1A0088);
+const Color accentYellow = Color(0xFFFFD700);
+const Color textDark = Color(0xFF1F2937);
+const Color textLight = Color(0xFF6B7280);
+const Color borderGrey = Color(0xFFE5E7EB);
+const Color bgGray = Color(0xFFF8FAFC);
 
 // ==================== DASHBOARD SCREEN ====================
 class DashboardScreen extends StatefulWidget {
@@ -26,6 +35,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _fetchItems();
+    _setupFCMToken(); 
+  }
+
+  Future<void> _setupFCMToken() async {
+    try {
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+      await messaging.requestPermission();
+      String? token = await messaging.getToken();
+      
+      if (token != null && currentUser != null) {
+        debugPrint("📱 FIREBASE DEVICE TOKEN: $token"); 
+        await http.post(
+          Uri.parse('https://huramay-app.onrender.com/api/user/update_token'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'user_id': currentUser!['id'],
+            'fcm_token': token,
+          }),
+        );
+      }
+    } catch (e) {
+      debugPrint("FCM Setup Error: $e");
+    }
   }
 
   Future<void> _fetchItems() async {
@@ -60,71 +92,133 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // VAVT-84: Check for user profile image
+    String? photoBase64 = currentUser?['photo_path'];
+    bool hasPhoto = photoBase64 != null && photoBase64.isNotEmpty;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: bgGray,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A0088),
-        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: textDark),
         title: Container(
-          height: 35,
+          height: 40,
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            color: bgGray,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: borderGrey, width: 1),
           ),
           child: TextField(
             controller: _searchCtrl,
             onChanged: (value) => _fetchItems(), 
+            style: const TextStyle(fontSize: 14, color: textDark, fontWeight: FontWeight.w500),
             decoration: const InputDecoration(
-              hintText: "Search",
-              prefixIcon: Icon(Icons.search, color: Colors.grey), // Icons can stay grey, text should be black
+              hintText: "Search items...",
+              hintStyle: TextStyle(color: textLight, fontSize: 14),
+              prefixIcon: Icon(Icons.search, color: textLight, size: 20), 
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(vertical: 8),
+              contentPadding: EdgeInsets.symmetric(vertical: 10),
             ),
           ),
         ),
         actions: [
-          IconButton(
-            onPressed: () => Navigator.push(
+          // VAVT-84: Dynamic Profile Picture Button
+          GestureDetector(
+            onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (c) => const ProfileScreen()),
             ),
-            icon: const Icon(Icons.account_circle, size: 30),
-          )
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10.0),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: primaryBlue.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: borderGrey, width: 1),
+                  image: hasPhoto 
+                    ? DecorationImage(image: MemoryImage(base64Decode(photoBase64!)), fit: BoxFit.cover) 
+                    : null,
+                ),
+                child: !hasPhoto 
+                  ? const Icon(Icons.person_outline, size: 20, color: textDark) 
+                  : null,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: borderGrey, height: 1),
+        ),
       ),
       drawer: const AppSidebar(),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(20), 
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "Dashboard",
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A0088),
-                  ),
-                ),
-                Row(
+          Positioned(
+            top: -80,
+            right: -60,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: primaryBlue.withOpacity(0.03),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 100,
+            left: -80,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: accentYellow.withOpacity(0.04), 
+              ),
+            ),
+          ),
+          
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 16), 
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    // CHANGED TO BLACK
-                    const Text("Filters ", style: TextStyle(fontSize: 12, color: Colors.black, fontWeight: FontWeight.bold)),
+                    const Text(
+                      "Dashboard",
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: textDark,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
                     Container(
-                      height: 35,
-                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      height: 32,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: borderGrey),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
                           value: _currentFilter,
-                          hint: const Text("All", style: TextStyle(fontSize: 12, color: Colors.black)),
-                          icon: const Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.black),
+                          hint: const Text("All Items", style: TextStyle(fontSize: 13, color: textDark, fontWeight: FontWeight.w600)),
+                          icon: const Icon(Icons.keyboard_arrow_down, size: 16, color: textLight),
+                          alignment: Alignment.centerRight,
                           items: ['Available', 'Borrowed'].map((String value) {
                             return DropdownMenuItem<String>(
                               value: value,
-                              child: Text(value, style: const TextStyle(fontSize: 12, color: Colors.black)),
+                              child: Text(value, style: const TextStyle(fontSize: 13, color: textDark, fontWeight: FontWeight.w600)),
                             );
                           }).toList(),
                           onChanged: (newValue) {
@@ -136,20 +230,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: isLoading 
-              ? const Center(child: CircularProgressIndicator()) 
-              : items.isEmpty 
-                  ? _emptyStateDashboard() 
-                  : ListView.builder(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.only(bottom: 80), // Padding so FAB doesn't cover last item
-                      itemCount: items.length,
-                      itemBuilder: (c, i) => _itemCard(context, items[i]),
-                    ),
+              ),
+              Expanded(
+                child: isLoading 
+                  ? const Center(child: CircularProgressIndicator(color: primaryBlue)) 
+                  : items.isEmpty 
+                      ? _emptyStateDashboard() 
+                      : ListView.builder(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.only(bottom: 100, top: 8), 
+                          itemCount: items.length,
+                          itemBuilder: (c, i) => _itemCard(context, items[i]),
+                        ),
+              ),
+            ],
           ),
         ],
       ),
@@ -162,36 +256,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
           _fetchItems();
         },
-        backgroundColor: const Color(0xFF1A0088), 
+        backgroundColor: primaryBlue, 
         foregroundColor: Colors.white,
         elevation: 4,
-        child: const Icon(Icons.add, size: 30),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: const Icon(Icons.add, size: 28),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
   Widget _emptyStateDashboard() {
     String message = "No Items Found";
-    if (_searchCtrl.text.trim().isNotEmpty) message = "No\nItems\nFound";
-    else if (_currentFilter == "Available") message = "No\nAvailable\nItems";
-    else if (_currentFilter == "Borrowed") message = "No\nBorrowed\nItems";
+    if (_searchCtrl.text.trim().isNotEmpty) message = "No results match your search";
+    else if (_currentFilter == "Available") message = "No items currently available";
+    else if (_currentFilter == "Borrowed") message = "No items currently borrowed";
     
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.inventory_2_outlined, size: 80, color: Colors.grey),
-          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: borderGrey),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))
+              ],
+            ),
+            child: const Icon(Icons.inventory_2_outlined, size: 48, color: textLight),
+          ),
+          const SizedBox(height: 24),
           Text(
             message,
             textAlign: TextAlign.center,
-            // CHANGED TO BLACK
             style: const TextStyle(
-              color: Colors.black,
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              height: 1.2,
+              color: textLight,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -212,37 +315,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       },
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFFF3F4F6), 
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: Colors.black12),
+          color: Colors.white, 
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderGrey, width: 1),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.03), 
-              blurRadius: 5, 
-              offset: const Offset(0, 3)
+              blurRadius: 16, 
+              offset: const Offset(0, 4)
             )
           ],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Image Container
             Container(
-              width: 90,
-              height: 90,
+              width: 80,
+              height: 80,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: bgGray,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF1A0088), width: 1.5), 
+                border: Border.all(color: borderGrey, width: 1), 
                 image: hasImage 
                   ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) 
                   : null,
               ),
-              child: !hasImage ? const Icon(Icons.image, size: 35, color: Colors.grey) : null,
+              child: !hasImage ? const Icon(Icons.image_outlined, size: 32, color: textLight) : null,
             ),
-            const SizedBox(width: 15),
+            const SizedBox(width: 16),
+            
+            // Text Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -253,50 +359,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Expanded(
                         child: Text(
                           item['owner'],
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A0088), fontSize: 13),
+                          style: const TextStyle(fontWeight: FontWeight.w600, color: textLight, fontSize: 12),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      // Modern Status Pill
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: isAvailable ? Colors.green.shade50 : Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: isAvailable ? Colors.green : Colors.red, width: 0.5),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: isAvailable ? Colors.green.shade200 : Colors.red.shade200, width: 1),
                         ),
                         child: Text(
                           item['status'],
                           style: TextStyle(
-                            color: isAvailable ? Colors.green : Colors.red, 
+                            color: isAvailable ? Colors.green.shade700 : Colors.red.shade700, 
                             fontWeight: FontWeight.bold, 
-                            fontSize: 10
+                            fontSize: 10,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       )
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
                     item['title'],
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87),
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textDark, height: 1.2),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    "Qty: ${item['quantity']}  •  Cond: ${item['condition']}",
-                    // CHANGED TO BLACK
-                    style: const TextStyle(fontSize: 12, color: Colors.black, fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  const Align(
-                    alignment: Alignment.bottomRight,
-                    child: Text(
-                      "Tap to view details", 
-                      // CHANGED TO BLACK
-                      style: TextStyle(fontSize: 10, color: Colors.black, fontStyle: FontStyle.italic)
-                    ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      const Icon(Icons.inventory_2_outlined, size: 14, color: textLight),
+                      const SizedBox(width: 4),
+                      Text(
+                        "Qty: ${item['quantity']}",
+                        style: const TextStyle(fontSize: 12, color: textDark, fontWeight: FontWeight.w500),
+                      ),
+                      const SizedBox(width: 12),
+                      const Icon(Icons.info_outline, size: 14, color: textLight),
+                      const SizedBox(width: 4),
+                      Text(
+                        item['condition'],
+                        style: const TextStyle(fontSize: 12, color: textDark, fontWeight: FontWeight.w500),
+                      ),
+                    ],
                   ),
                 ],
               ),

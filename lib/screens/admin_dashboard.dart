@@ -7,8 +7,16 @@ import 'dart:io';
 import '../globals.dart';
 import 'auth_screens.dart'; // Needed for LoginScreen routing
 
+// ==================== SHARED DESIGN CONSTANTS ====================
+const Color primaryBlue = Color(0xFF1A0088);
+const Color accentYellow = Color(0xFFFFD700);
+const Color textDark = Color(0xFF1F2937);
+const Color textLight = Color(0xFF6B7280);
+const Color borderGrey = Color(0xFFE5E7EB);
+const Color bgGray = Color(0xFFF8FAFC);
+
 // =========================================================================
-// 1. ADMIN DASHBOARD
+// 1. ADMIN DASHBOARD WRAPPER (BOTTOM NAV BAR)
 // =========================================================================
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -18,6 +26,61 @@ class AdminDashboard extends StatefulWidget {
 }
 
 class _AdminDashboardState extends State<AdminDashboard> {
+  int _currentIndex = 0;
+
+  final List<Widget> _pages = [
+    const AdminItemsFeed(),
+    const AdminUserListScreen(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: bgGray,
+      body: _pages[_currentIndex], 
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: const Border(top: BorderSide(color: borderGrey, width: 1)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 20, offset: const Offset(0, -5))
+          ]
+        ),
+        child: NavigationBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          selectedIndex: _currentIndex,
+          indicatorColor: primaryBlue.withOpacity(0.1),
+          onDestinationSelected: (index) => setState(() => _currentIndex = index),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.inventory_2_outlined, color: textLight),
+              selectedIcon: Icon(Icons.inventory_2, color: primaryBlue),
+              label: 'Items Feed',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.people_outline, color: textLight),
+              selectedIcon: Icon(Icons.people, color: primaryBlue),
+              label: 'Users',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =========================================================================
+// 2. ADMIN ITEMS FEED 
+// =========================================================================
+class AdminItemsFeed extends StatefulWidget {
+  const AdminItemsFeed({super.key});
+
+  @override
+  State<AdminItemsFeed> createState() => _AdminItemsFeedState();
+}
+
+class _AdminItemsFeedState extends State<AdminItemsFeed> {
   List<dynamic> allItems = [];
   bool isLoading = true;
   final TextEditingController _searchCtrl = TextEditingController();
@@ -31,7 +94,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Future<void> _fetchAllItems() async {
     setState(() => isLoading = true);
     try {
-      // FIXED: Swapped hardcoded IP for https://huramay-app.onrender.com
       String url = 'https://huramay-app.onrender.com/api/items';
       String searchQuery = _searchCtrl.text.trim();
       if (searchQuery.isNotEmpty) {
@@ -63,35 +125,24 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
-  Future<void> _executeBan(int userId) async {
-    try {
-      final res = await http.delete(Uri.parse('https://huramay-app.onrender.com/api/users/$userId'));
-      if (res.statusCode == 200) {
-        _fetchAllItems();
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User Banned permanently.")));
-      }
-    } catch (e) {
-      debugPrint("Ban error: $e");
-    }
-  }
-
   void _showConfirmation(String title, String content, VoidCallback onConfirm) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A0088))),
-        content: Text(content),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, color: textDark)),
+        content: Text(content, style: const TextStyle(color: textLight, fontSize: 14)),
         actions: [
           OutlinedButton(
             onPressed: () => Navigator.pop(ctx),
             style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF1A0088),
-              side: const BorderSide(color: Color(0xFF1A0088), width: 1.5),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              foregroundColor: textDark,
+              side: const BorderSide(color: borderGrey, width: 1.5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.w600)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -99,11 +150,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
               onConfirm();
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: Colors.red.shade600,
               foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text("Confirm", style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text("Confirm", style: TextStyle(fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -125,24 +177,28 @@ class _AdminDashboardState extends State<AdminDashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: bgGray,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A0088),
-        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: textDark),
         title: Container(
-          height: 35,
+          height: 40,
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            color: bgGray,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: borderGrey, width: 1),
           ),
           child: TextField(
             controller: _searchCtrl,
             onChanged: (value) => _fetchAllItems(),
+            style: const TextStyle(fontSize: 14, color: textDark, fontWeight: FontWeight.w500),
             decoration: const InputDecoration(
-              hintText: "Search items...",
-              prefixIcon: Icon(Icons.search, color: Colors.grey),
+              hintText: "Search feed...",
+              hintStyle: TextStyle(color: textLight, fontSize: 14),
+              prefixIcon: Icon(Icons.search, color: textLight, size: 20),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(vertical: 8),
+              contentPadding: EdgeInsets.symmetric(vertical: 10),
             ),
           ),
         ),
@@ -154,42 +210,76 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 MaterialPageRoute(builder: (c) => const AdminProfileScreen())
               );
             },
-            icon: const Icon(Icons.account_circle, size: 30),
-          )
-        ],
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(20),
-            child: Text(
-              "Admin Dashboard",
-              style: TextStyle(
-                fontSize: 28, 
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1A0088),
-              ),
-            ),
+            icon: const Icon(Icons.account_circle_outlined, size: 28, color: textDark),
           ),
-          Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : allItems.isEmpty
-                    ? const Center(child: Text("No items found.", style: TextStyle(color: Colors.grey, fontSize: 18)))
-                    : ListView.builder(
-                        itemCount: allItems.length,
-                        itemBuilder: (context, index) => _buildAdminCard(allItems[index]),
-                      ),
+          const SizedBox(width: 8),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: borderGrey, height: 1),
+        ),
+      ),
+      body: Stack(
+        children: [
+          // Background Geometry
+          Positioned(
+            top: -80,
+            right: -60,
+            child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withOpacity(0.03))),
+          ),
+          Positioned(
+            bottom: 100,
+            left: -80,
+            child: Container(width: 200, height: 200, decoration: BoxDecoration(shape: BoxShape.circle, color: accentYellow.withOpacity(0.04))),
+          ),
+
+          // Main Content
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(24, 24, 24, 16),
+                child: Text(
+                  "Item Reports",
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: textDark, letterSpacing: -0.5),
+                ),
+              ),
+              Expanded(
+                child: isLoading
+                    ? const Center(child: CircularProgressIndicator(color: primaryBlue))
+                    : allItems.isEmpty
+                        ? _emptyState()
+                        : ListView.builder(
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.only(bottom: 24),
+                            itemCount: allItems.length,
+                            itemBuilder: (context, index) => _buildAdminCard(allItems[index]),
+                          ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  // =======================================================================
-  // UPDATED: Modern UI Match for the Admin Card
-  // =======================================================================
+  Widget _emptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: borderGrey)),
+            child: const Icon(Icons.check_circle_outline, size: 48, color: textLight),
+          ),
+          const SizedBox(height: 24),
+          const Text("No items found. Feed is clean.", style: TextStyle(color: textLight, fontSize: 16, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAdminCard(dynamic item) {
     String? imgPath = item['image'];
     bool hasImage = imgPath != null && imgPath.isNotEmpty;
@@ -197,151 +287,444 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     return GestureDetector(
       onTap: () => _openAdminReportModal(item), 
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF3F4F6), // Matches the modern dashboard grey
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: Colors.black12, width: 1),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Left side: The White Image Box with Blue Border
-              Container(
-                width: 85,
-                height: 85,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: isFlagged ? Colors.red : const Color(0xFF1A0088), width: 1.5),
-                  image: hasImage ? DecorationImage(image: FileImage(File(imgPath!)), fit: BoxFit.cover) : null,
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    if (!hasImage) const Icon(Icons.image, size: 30, color: Colors.grey),
-                    if (isFlagged)
-                      Container(
-                        width: double.infinity,
-                        height: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.6),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.do_not_disturb_alt, size: 45, color: Colors.red),
-                      ),
-                  ],
-                ),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: isFlagged ? Colors.red.shade100 : borderGrey, width: 1),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 16, offset: const Offset(0, 4))],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: bgGray,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: isFlagged ? Colors.red.shade300 : borderGrey, width: 1),
+                image: hasImage ? DecorationImage(image: FileImage(File(imgPath)), fit: BoxFit.cover) : null,
               ),
-              const SizedBox(width: 15),
-              // Right side: Details & Buttons
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Row 1: Name & Status Pill
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  if (!hasImage) const Icon(Icons.image_outlined, size: 32, color: textLight),
+                  if (isFlagged)
+                    Container(
+                      width: double.infinity, height: double.infinity,
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.7), borderRadius: BorderRadius.circular(11)),
+                      child: const Icon(Icons.warning_amber_rounded, size: 36, color: Colors.red),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item['owner'],
+                          style: const TextStyle(fontWeight: FontWeight.w600, color: textLight, fontSize: 12),
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isFlagged ? Colors.red.shade50 : Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: isFlagged ? Colors.red.shade200 : Colors.green.shade200, width: 1),
+                        ),
+                        child: Text(
+                          item['status'],
+                          style: TextStyle(
+                            color: isFlagged ? Colors.red.shade700 : Colors.green.shade700, 
+                            fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 0.5
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    item['title'],
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textDark, height: 1.2),
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item['dept'],
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: textLight),
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 16),
+                  if (isFlagged)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: _modernAdminBtn("Delete Flagged Item", Colors.red.shade600, Colors.white, () {
+                        _showConfirmation("Delete Flagged Item", "Are you sure you want to permanently delete '${item['title']}'?", () => _executeDelete(item['id']));
+                      }),
+                    )
+                  else
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Expanded(
-                          child: Text(
-                            item['owner'],
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A0088), fontSize: 13),
-                            maxLines: 1, overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 5),
-                        // Modern Status Pill (Green for Available, Red for Flagged)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: isFlagged ? Colors.red.shade50 : Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: isFlagged ? Colors.red : Colors.green, width: 1),
-                          ),
-                          child: Text(
-                            item['status'],
-                            style: TextStyle(
-                              color: isFlagged ? Colors.red : Colors.green, 
-                              fontWeight: FontWeight.bold, 
-                              fontSize: 10
-                            ),
-                          ),
-                        ),
+                        _modernAdminBtn("Review", Colors.white, textDark, () {
+                          _openAdminReportModal(item);
+                        }, isOutlined: true),
+                        const SizedBox(width: 8),
+                        _modernAdminBtn("Delete", Colors.red.shade50, Colors.red.shade700, () {
+                          _showConfirmation("Delete Item", "Are you sure you want to permanently delete '${item['title']}' from the feed?", () => _executeDelete(item['id']));
+                        }),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    // Row 2: Title
-                    Text(
-                      item['title'],
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
-                      maxLines: 1, overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    // Row 3: Department
-                    Text(
-                      item['dept'],
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87),
-                      maxLines: 1, overflow: TextOverflow.ellipsis,
-                    ),
-                    
-                    const SizedBox(height: 12),
-                    // Row 4: Buttons docked to the bottom right
-                    if (isFlagged)
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: _adminBtn("Delete Flagged Item", Colors.red, () {
-                          _showConfirmation("Delete Flagged Item", "Are you sure you want to permanently delete '${item['title']}'?", () => _executeDelete(item['id']));
-                        }, textColor: Colors.white),
-                      )
-                    else
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          _adminBtn("Review", Colors.yellow, () {
-                            _openAdminReportModal(item);
-                          }),
-                          const SizedBox(width: 10),
-                          _adminBtn("Delete", Colors.yellow, () {
-                            _showConfirmation("Delete Item", "Are you sure you want to permanently delete '${item['title']}' from the feed?", () => _executeDelete(item['id']));
-                          }),
-                        ],
-                      ),
-                  ],
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _adminBtn(String text, Color color, VoidCallback action, {Color textColor = Colors.black}) {
+  Widget _modernAdminBtn(String text, Color bgColor, Color textColor, VoidCallback action, {bool isOutlined = false}) {
     return GestureDetector(
       onTap: action,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(15), // Softer pill shape
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 2, offset: const Offset(0, 2))]
+          color: bgColor,
+          borderRadius: BorderRadius.circular(8),
+          border: isOutlined ? Border.all(color: borderGrey) : null,
         ),
-        child: Text(
-          text,
-          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
-        ),
+        child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textColor)),
       ),
     );
   }
 }
 
 // =========================================================================
-// 2. THE ADMIN REPORT OVERLAY DIALOG 
+// 3. USER MANAGEMENT SCREEN
+// =========================================================================
+class AdminUserListScreen extends StatefulWidget {
+  const AdminUserListScreen({super.key});
+
+  @override
+  State<AdminUserListScreen> createState() => _AdminUserListScreenState();
+}
+
+class _AdminUserListScreenState extends State<AdminUserListScreen> {
+  List<dynamic> allUsers = [];
+  List<dynamic> filteredUsers = []; 
+  bool isLoading = true;
+  final TextEditingController _searchCtrl = TextEditingController();
+  
+  String _currentSort = 'Name (A-Z)';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUsers();
+  }
+
+  Future<void> _fetchUsers() async {
+    setState(() => isLoading = true);
+    try {
+      final res = await http.get(Uri.parse('https://huramay-app.onrender.com/api/users'));
+      if (res.statusCode == 200) {
+        setState(() {
+          allUsers = jsonDecode(res.body);
+          filteredUsers = List.from(allUsers);
+        });
+        _applySorting(); 
+      }
+    } catch (e) {
+      debugPrint("Fetch users error: $e");
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  void _applySorting() {
+    setState(() {
+      if (_currentSort == 'Name (A-Z)') {
+        filteredUsers.sort((a, b) => a['full_name'].toString().toLowerCase().compareTo(b['full_name'].toString().toLowerCase()));
+      } else if (_currentSort == 'Name (Z-A)') {
+        filteredUsers.sort((a, b) => b['full_name'].toString().toLowerCase().compareTo(a['full_name'].toString().toLowerCase()));
+      } else if (_currentSort == 'Department') {
+        filteredUsers.sort((a, b) {
+          int deptComp = a['department'].toString().toLowerCase().compareTo(b['department'].toString().toLowerCase());
+          if (deptComp == 0) {
+            return a['full_name'].toString().toLowerCase().compareTo(b['full_name'].toString().toLowerCase());
+          }
+          return deptComp;
+        });
+      }
+    });
+  }
+
+  void _runFilter(String enteredKeyword) {
+    List<dynamic> results = [];
+    if (enteredKeyword.isEmpty) {
+      results = List.from(allUsers); 
+    } else {
+      results = allUsers.where((user) {
+        final nameLower = user['full_name'].toString().toLowerCase();
+        final emailLower = user['email'].toString().toLowerCase();
+        final deptLower = user['department'].toString().toLowerCase();
+        final searchLower = enteredKeyword.toLowerCase();
+        
+        return nameLower.contains(searchLower) || 
+               emailLower.contains(searchLower) || 
+               deptLower.contains(searchLower);
+      }).toList();
+    }
+
+    setState(() {
+      filteredUsers = results;
+    });
+    _applySorting(); 
+  }
+
+  Future<void> _executeBanUser(int userId) async {
+    try {
+      final res = await http.delete(Uri.parse('https://huramay-app.onrender.com/api/users/$userId'));
+      if (res.statusCode == 200) {
+        _fetchUsers();
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User banned permanently.")));
+      }
+    } catch (e) {
+      debugPrint("Ban error: $e");
+    }
+  }
+
+  void _showBanConfirmation(dynamic user) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red),
+            SizedBox(width: 8),
+            Text("Ban User?", style: TextStyle(fontWeight: FontWeight.w800, color: textDark)),
+          ],
+        ),
+        content: Text("Are you sure you want to permanently ban '${user['full_name']}' and remove all their items?", style: const TextStyle(color: textLight, fontSize: 14)),
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: textDark,
+              side: const BorderSide(color: borderGrey, width: 1.5),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.w600)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _executeBanUser(user['id']);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade600, 
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text("Ban User", style: TextStyle(fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: bgGray,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: const Text("Registered Users", style: TextStyle(color: textDark, fontWeight: FontWeight.w800)),
+        centerTitle: false,
+        actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (c) => const AdminProfileScreen()));
+            },
+            icon: const Icon(Icons.account_circle_outlined, size: 28, color: textDark),
+          ),
+          const SizedBox(width: 8),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: borderGrey, height: 1),
+        ),
+      ),
+      body: Stack(
+        children: [
+          // Background Geometry
+          Positioned(
+            top: -80, right: -60,
+            child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withOpacity(0.03))),
+          ),
+          
+          Column(
+            children: [
+              // Search & Filter Header
+              Container(
+                padding: const EdgeInsets.all(24),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: borderGrey),
+                        ),
+                        child: TextField(
+                          controller: _searchCtrl,
+                          onChanged: (value) => _runFilter(value),
+                          style: const TextStyle(fontSize: 14, color: textDark, fontWeight: FontWeight.w500),
+                          decoration: const InputDecoration(
+                            hintText: "Search name, email...",
+                            hintStyle: TextStyle(fontSize: 14, color: textLight),
+                            prefixIcon: Icon(Icons.search, size: 20, color: textLight),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Sorting Menu
+                    Container(
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: borderGrey),
+                      ),
+                      child: PopupMenuButton<String>(
+                        icon: const Icon(Icons.sort, color: textDark, size: 22),
+                        tooltip: "Sort Users",
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        onSelected: (String newValue) {
+                          setState(() => _currentSort = newValue);
+                          _applySorting();
+                        },
+                        itemBuilder: (BuildContext context) => [
+                          PopupMenuItem(value: 'Name (A-Z)', child: Text('Name (A-Z)', style: TextStyle(fontWeight: _currentSort == 'Name (A-Z)' ? FontWeight.bold : FontWeight.normal, color: textDark))),
+                          PopupMenuItem(value: 'Name (Z-A)', child: Text('Name (Z-A)', style: TextStyle(fontWeight: _currentSort == 'Name (Z-A)' ? FontWeight.bold : FontWeight.normal, color: textDark))),
+                          PopupMenuItem(value: 'Department', child: Text('By Department', style: TextStyle(fontWeight: _currentSort == 'Department' ? FontWeight.bold : FontWeight.normal, color: textDark))),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Total Count Row
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  children: [
+                    const Text("Total Users: ", style: TextStyle(color: textLight, fontWeight: FontWeight.w500, fontSize: 14)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(color: primaryBlue.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                      child: Text("${filteredUsers.length}", style: const TextStyle(color: primaryBlue, fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // User List
+              Expanded(
+                child: isLoading
+                    ? const Center(child: CircularProgressIndicator(color: primaryBlue))
+                    : filteredUsers.isEmpty
+                        ? const Center(child: Text("No users match your search.", style: TextStyle(color: textLight)))
+                        : ListView.builder(
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.only(bottom: 24),
+                            itemCount: filteredUsers.length,
+                            itemBuilder: (context, index) {
+                              final user = filteredUsers[index];
+                              String initials = user['full_name'].toString().isNotEmpty 
+                                  ? user['full_name'].toString().substring(0, 1).toUpperCase() 
+                                  : "?";
+
+                              return Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: borderGrey),
+                                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2))],
+                                ),
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 24,
+                                      backgroundColor: primaryBlue.withOpacity(0.1),
+                                      foregroundColor: primaryBlue,
+                                      child: Text(initials, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            user['full_name'], 
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textDark),
+                                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(user['email'], style: const TextStyle(fontSize: 13, color: textLight)),
+                                          const SizedBox(height: 2),
+                                          Text(user['department'], style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: textDark), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.block, color: Colors.red, size: 24),
+                                      tooltip: "Ban User",
+                                      onPressed: () => _showBanConfirmation(user),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =========================================================================
+// 4. THE ADMIN REPORT OVERLAY DIALOG 
 // =========================================================================
 class AdminReportOverlay extends StatefulWidget {
   final dynamic itemData;
@@ -371,28 +754,37 @@ class _AdminReportOverlayState extends State<AdminReportOverlay> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const Icon(Icons.info_outline, size: 48, color: primaryBlue),
+            const SizedBox(height: 16),
             const Text(
-              "Are you sure you want to report?",
+              "Submit Report?",
               textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 16),
+              style: TextStyle(color: textDark, fontWeight: FontWeight.w800, fontSize: 18),
             ),
-            const SizedBox(height: 25),
+            const SizedBox(height: 8),
+            const Text(
+              "Are you sure you want to flag this item?",
+              textAlign: TextAlign.center,
+              style: TextStyle(color: textLight, fontSize: 14),
+            ),
+            const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 OutlinedButton(
                   onPressed: () => Navigator.pop(context),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF1A0088),
-                    side: const BorderSide(color: Color(0xFF1A0088), width: 1.5),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    minimumSize: const Size(90, 40),
+                    foregroundColor: textDark,
+                    side: const BorderSide(color: borderGrey, width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    minimumSize: const Size(100, 44),
                   ),
-                  child: const Text("No", style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.w600)),
                 ),
                 ElevatedButton(
                   onPressed: () {
@@ -400,13 +792,13 @@ class _AdminReportOverlayState extends State<AdminReportOverlay> {
                     _submitReportToBackend(); 
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.yellow,
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    minimumSize: const Size(90, 40),
+                    backgroundColor: primaryBlue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    minimumSize: const Size(100, 44),
                     elevation: 0,
                   ),
-                  child: const Text("Yes", style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text("Submit", style: TextStyle(fontWeight: FontWeight.w600)),
                 ),
               ],
             )
@@ -447,75 +839,82 @@ class _AdminReportOverlayState extends State<AdminReportOverlay> {
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.all(20),
+      insetPadding: const EdgeInsets.all(24),
       child: Container(
         width: double.infinity,
         height: MediaQuery.of(context).size.height * 0.65, 
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: Colors.white, 
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 5))],
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 10))],
         ),
         child: Column(
           children: [
-            Align(
-              alignment: Alignment.topLeft,
-              child: GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.blue.shade50, shape: BoxShape.circle),
-                  child: const Icon(Icons.close, size: 18, color: Color(0xFF1A0088)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Review Item", style: TextStyle(color: textDark, fontWeight: FontWeight.w800, fontSize: 18)),
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: bgGray, shape: BoxShape.circle, border: Border.all(color: borderGrey)),
+                    child: const Icon(Icons.close, size: 20, color: textLight),
+                  ),
                 ),
-              ),
+              ],
             ),
+            const SizedBox(height: 24),
             Container(
-              width: 130,
-              height: 130,
+              width: 120,
+              height: 120,
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: const Color(0xFF1A0088), width: 3),
+                color: bgGray,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: borderGrey, width: 1),
                 image: hasImage ? DecorationImage(image: FileImage(File(imgPath)), fit: BoxFit.cover) : null,
               ),
-              child: !hasImage ? const Icon(Icons.image, size: 50, color: Colors.grey) : null,
+              child: !hasImage ? const Icon(Icons.image_outlined, size: 40, color: textLight) : null,
             ),
-            const SizedBox(height: 20),
-            const Text("Type here your report", style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 10),
+            const SizedBox(height: 24),
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6), 
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: Colors.black12)
+                  color: bgGray, 
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderGrey)
                 ),
                 child: TextField(
                   controller: _reportTextCtrl,
                   maxLines: null, 
                   keyboardType: TextInputType.multiline,
+                  style: const TextStyle(fontSize: 14, color: textDark),
                   decoration: const InputDecoration(
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.all(15),
+                    contentPadding: EdgeInsets.all(16),
                     hintText: "Enter formal flag reason or note...",
+                    hintStyle: TextStyle(color: textLight, fontSize: 14)
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             isSubmitting 
-              ? const CircularProgressIndicator()
-              : ElevatedButton(
-                  onPressed: _handleReport, 
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-                    padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 12),
-                    elevation: 0,
+              ? const CircularProgressIndicator(color: primaryBlue)
+              : SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _handleReport, 
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade600,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    child: const Text("Submit Flag Report", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                   ),
-                  child: const Text("Report", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 )
           ],
         ),
@@ -525,7 +924,7 @@ class _AdminReportOverlayState extends State<AdminReportOverlay> {
 }
 
 // =========================================================================
-// 3. ADMIN PROFILE SCREEN
+// 5. ADMIN PROFILE SCREEN
 // =========================================================================
 class AdminProfileScreen extends StatelessWidget {
   const AdminProfileScreen({super.key});
@@ -542,66 +941,78 @@ class AdminProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: bgGray,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A0088),
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text("Admin Profile", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: textDark),
+        title: const Text("Admin Profile", style: TextStyle(color: textDark, fontWeight: FontWeight.w800)),
         centerTitle: true,
+        bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(color: borderGrey, height: 1)),
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(5),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.yellow, width: 3),
+                color: Colors.white,
+                border: Border.all(color: borderGrey, width: 1),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
               ),
               child: const CircleAvatar(
                 radius: 60,
-                backgroundColor: Color(0xFF1A0088),
-                child: Icon(Icons.admin_panel_settings, size: 70, color: Colors.white),
+                backgroundColor: primaryBlue,
+                child: Icon(Icons.admin_panel_settings_outlined, size: 60, color: Colors.white),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             Text(
               currentUser?['full_name'] ?? "System Administrator",
-              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1A0088)),
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: textDark, letterSpacing: -0.5),
             ),
             const SizedBox(height: 8),
             Text(
-              currentUser?['email'] ?? "admin@gmail.com",
-              style: const TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.w600),
+              currentUser?['email'] ?? "admin@lnu.edu.ph",
+              style: const TextStyle(fontSize: 14, color: textLight, fontWeight: FontWeight.w500),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 48),
             
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (c) => const AdminManagementScreen()));
-              },
-              icon: const Icon(Icons.manage_accounts),
-              label: const Text("Manage Admins", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF1A0088),
-                side: const BorderSide(color: Color(0xFF1A0088), width: 2),
-                minimumSize: const Size(200, 50),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (c) => const AdminManagementScreen()));
+                },
+                icon: const Icon(Icons.manage_accounts_outlined, size: 20),
+                label: const Text("Manage Administrators", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: textDark,
+                  side: const BorderSide(color: borderGrey, width: 1),
+                  backgroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
               ),
             ),
             
-            const SizedBox(height: 15),
+            const SizedBox(height: 16),
 
-            ElevatedButton.icon(
-              onPressed: () => _logout(context),
-              icon: const Icon(Icons.logout, color: Colors.black),
-              label: const Text("Logout", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.yellow,
-                minimumSize: const Size(200, 50),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-                elevation: 0,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: ElevatedButton.icon(
+                onPressed: () => _logout(context),
+                icon: const Icon(Icons.logout, size: 20),
+                label: const Text("Sign Out", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade50,
+                  foregroundColor: Colors.red.shade700,
+                  minimumSize: const Size(double.infinity, 50),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
               ),
             ),
           ],
@@ -612,7 +1023,7 @@ class AdminProfileScreen extends StatelessWidget {
 }
 
 // =========================================================================
-// 4. ADMIN MANAGEMENT SCREEN 
+// 6. ADMIN MANAGEMENT SCREEN 
 // =========================================================================
 class AdminManagementScreen extends StatefulWidget {
   const AdminManagementScreen({super.key});
@@ -665,6 +1076,7 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
   }
 
   void _showAddAdminModal() {
+    final _formKey = GlobalKey<FormState>();
     final _nameCtrl = TextEditingController();
     final _emailCtrl = TextEditingController();
     final _passCtrl = TextEditingController();
@@ -677,47 +1089,82 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
         builder: (context, setModalState) {
           return AlertDialog(
             backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-            title: const Text("Create New Admin", style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold)),
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text("Create New Admin", style: TextStyle(color: textDark, fontWeight: FontWeight.w800, fontSize: 18)),
             content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: _nameCtrl,
-                    decoration: InputDecoration(labelText: "Full Name", filled: true, fillColor: Colors.grey.shade100, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _emailCtrl,
-                    decoration: InputDecoration(labelText: "Email (@gmail.com)", filled: true, fillColor: Colors.grey.shade100, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _passCtrl,
-                    obscureText: true,
-                    decoration: InputDecoration(labelText: "Password", filled: true, fillColor: Colors.grey.shade100, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none)),
-                  ),
-                ],
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: _nameCtrl,
+                      style: const TextStyle(fontSize: 14, color: textDark),
+                      decoration: InputDecoration(
+                        labelText: "Full Name", 
+                        labelStyle: const TextStyle(color: textLight),
+                        filled: true, fillColor: bgGray, 
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) return "Name is required";
+                        if (!RegExp(r'^[a-zA-Z\s.]+$').hasMatch(value)) return "No special characters/emojis";
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _emailCtrl,
+                      style: const TextStyle(fontSize: 14, color: textDark),
+                      decoration: InputDecoration(
+                        labelText: "Email Address", 
+                        labelStyle: const TextStyle(color: textLight),
+                        filled: true, fillColor: bgGray, 
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) return "Email is required";
+                        if (!RegExp(r'^[a-zA-Z0-9._]+@gmail\.com$').hasMatch(value)) return "Must end in @gmail.com";
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _passCtrl,
+                      obscureText: true,
+                      style: const TextStyle(fontSize: 14, color: textDark),
+                      decoration: InputDecoration(
+                        labelText: "Password", 
+                        labelStyle: const TextStyle(color: textLight),
+                        filled: true, fillColor: bgGray, 
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) return "Password is required";
+                        if (RegExp(r'[^\x00-\x7F]').hasMatch(value)) return "Cannot contain emojis";
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
             actions: [
               OutlinedButton(
                 onPressed: () => Navigator.pop(ctx),
-                style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF1A0088), side: const BorderSide(color: Color(0xFF1A0088), width: 1.5)),
-                child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(foregroundColor: textDark, side: const BorderSide(color: borderGrey, width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.w600)),
               ),
               isSubmitting 
-                ? const CircularProgressIndicator() 
+                ? const CircularProgressIndicator(color: primaryBlue) 
                 : ElevatedButton(
                     onPressed: () async {
-                      if (_nameCtrl.text.trim().isEmpty || _emailCtrl.text.trim().isEmpty || _passCtrl.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill all fields.")));
-                        return;
-                      }
-                      
+                      if (!_formKey.currentState!.validate()) return;
                       setModalState(() => isSubmitting = true);
-                      
                       try {
                         final res = await http.post(
                           Uri.parse('https://huramay-app.onrender.com/api/admins/create'),
@@ -729,7 +1176,6 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
                             'is_admin': true 
                           }),
                         );
-                        
                         if (res.statusCode == 201) {
                           if (context.mounted) Navigator.pop(ctx);
                           _fetchAdmins();
@@ -744,8 +1190,8 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
                         setModalState(() => isSubmitting = false);
                       }
                     },
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A0088), foregroundColor: Colors.white),
-                    child: const Text("Create", style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(backgroundColor: primaryBlue, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                    child: const Text("Create", style: TextStyle(fontWeight: FontWeight.w600)),
                   ),
             ],
           );
@@ -757,35 +1203,41 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: bgGray,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A0088),
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text("Manage Admins", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: textDark),
+        title: const Text("Manage Admins", style: TextStyle(color: textDark, fontWeight: FontWeight.w800)),
+        bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(color: borderGrey, height: 1)),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddAdminModal,
-        backgroundColor: Colors.yellow,
-        foregroundColor: Colors.black,
-        icon: const Icon(Icons.add),
-        label: const Text("Add Admin", style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: primaryBlue,
+        foregroundColor: Colors.white,
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        icon: const Icon(Icons.add, size: 20),
+        label: const Text("Add Admin", style: TextStyle(fontWeight: FontWeight.w600)),
       ),
       body: isLoading 
-        ? const Center(child: CircularProgressIndicator())
+        ? const Center(child: CircularProgressIndicator(color: primaryBlue))
         : ListView.builder(
-            padding: const EdgeInsets.all(20),
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.all(24),
             itemCount: adminList.length,
             itemBuilder: (context, index) {
               final admin = adminList[index];
               bool isSuperAdmin = admin['email'] == superAdminEmail;
 
               return Container(
-                margin: const EdgeInsets.only(bottom: 15),
-                padding: const EdgeInsets.all(15),
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: Colors.black12)
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: borderGrey),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2))]
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -795,18 +1247,19 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
                       children: [
                         Row(
                           children: [
-                            Text(admin['full_name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
+                            Text(admin['full_name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textDark)),
                             if (isSuperAdmin) ...[
                               const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(color: Colors.yellow, borderRadius: BorderRadius.circular(10)),
-                                child: const Text("Super Admin", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                decoration: BoxDecoration(color: primaryBlue.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                                child: const Text("Super Admin", style: TextStyle(color: primaryBlue, fontSize: 10, fontWeight: FontWeight.bold)),
                               )
                             ]
                           ],
                         ),
-                        Text(admin['email'], style: const TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 2),
+                        Text(admin['email'], style: const TextStyle(color: textLight, fontSize: 13, fontWeight: FontWeight.w500)),
                       ],
                     ),
                     if (!isSuperAdmin)
@@ -817,22 +1270,23 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
                             context: context,
                             builder: (deleteCtx) => AlertDialog(
                               backgroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                              title: const Text("Delete Admin?", style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold)),
-                              content: Text("Are you sure you want to permanently delete the admin account for '${admin['email']}'?"),
+                              surfaceTintColor: Colors.transparent,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              title: const Text("Delete Admin?", style: TextStyle(color: textDark, fontWeight: FontWeight.w800)),
+                              content: Text("Are you sure you want to permanently delete the admin account for '${admin['email']}'?", style: const TextStyle(color: textLight, fontSize: 14)),
                               actions: [
                                 OutlinedButton(
                                   onPressed: () => Navigator.pop(deleteCtx),
-                                  style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF1A0088), side: const BorderSide(color: Color(0xFF1A0088), width: 1.5)),
-                                  child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.bold)),
+                                  style: OutlinedButton.styleFrom(foregroundColor: textDark, side: const BorderSide(color: borderGrey, width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                                  child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.w600)),
                                 ),
                                 ElevatedButton(
                                   onPressed: () {
                                     Navigator.pop(deleteCtx);
                                     _deleteAdmin(admin['id'], admin['email']);
                                   },
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                                  child: const Text("Delete", style: TextStyle(fontWeight: FontWeight.bold)),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade600, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                                  child: const Text("Delete", style: TextStyle(fontWeight: FontWeight.w600)),
                                 ),
                               ],
                             )

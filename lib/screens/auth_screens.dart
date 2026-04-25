@@ -1,16 +1,87 @@
 // lib/screens/auth_screens.dart
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-
 import '../globals.dart';
-import '../utils/ui_helpers.dart';
 import 'dashboard_screen.dart';
 import 'admin_dashboard.dart'; 
 
-// ==================== AUTH & PROFILE SCREENS ====================
+// ==================== MODERN UI TOAST HELPERS ====================
+void showErrorToast(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).hideCurrentSnackBar(); 
+  final screenHeight = MediaQuery.of(context).size.height;
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: [
+          const Icon(Icons.error_outline, color: Colors.white, size: 24),
+          const SizedBox(width: 12),
+          Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14))),
+        ],
+      ),
+      backgroundColor: Colors.red.shade700, 
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)), 
+      margin: EdgeInsets.only(bottom: screenHeight - 130, left: 20, right: 20),
+      dismissDirection: DismissDirection.up,
+      elevation: 4,
+      duration: const Duration(seconds: 4),
+    ),
+  );
+}
+
+void showSuccessToast(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+  final screenHeight = MediaQuery.of(context).size.height;
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: [
+          const Icon(Icons.check_circle_outline, color: Colors.white, size: 24),
+          const SizedBox(width: 12),
+          Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14))),
+        ],
+      ),
+      backgroundColor: Colors.green.shade700, 
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      margin: EdgeInsets.only(bottom: screenHeight - 130, left: 20, right: 20),
+      dismissDirection: DismissDirection.up,
+      elevation: 4,
+      duration: const Duration(seconds: 3),
+    ),
+  );
+}
+
+// ==================== SHARED DESIGN CONSTANTS ====================
+const Color primaryBlue = Color(0xFF1A0088);
+const Color accentYellow = Color(0xFFFFD700);
+const Color textDark = Color(0xFF1F2937);
+const Color textLight = Color(0xFF6B7280);
+const Color borderGrey = Color(0xFFE5E7EB);
+
+InputDecoration modernInputDecoration(String hint, {Widget? suffixIcon}) {
+  return InputDecoration(
+    hintText: hint,
+    hintStyle: const TextStyle(color: textLight, fontSize: 14),
+    filled: true,
+    fillColor: Colors.white,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderGrey)),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderGrey)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: primaryBlue, width: 1.5)),
+    errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.red.shade300)),
+    errorStyle: TextStyle(color: Colors.red.shade400, fontWeight: FontWeight.w600, fontSize: 12),
+    suffixIcon: suffixIcon,
+  );
+}
+
+// ==================== AUTH SCREENS ====================
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
   @override
@@ -20,114 +91,190 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
-  
-  // NEW: Added FormKey and visibility boolean
   final _formKey = GlobalKey<FormState>();
   bool _obscurePass = true;
+  bool _isLoading = false;
 
   Future<void> doLogin() async {
-    // NEW: Trigger validators before making the HTTP request
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      showErrorToast(context, "Please fix the missing fields to login.");
+      return;
+    }
+    setState(() => _isLoading = true);
 
     try {
       var res = await http.post(
         Uri.parse('https://huramay-app.onrender.com/api/login'), 
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': _emailCtrl.text, 'password': _passCtrl.text}),
+        body: jsonEncode({'email': _emailCtrl.text.trim(), 'password': _passCtrl.text}),
       );
-      
-      if (!mounted) return; // FIX: Prevent BuildContext across async gaps warning
+      if (!mounted) return; 
 
       var data = jsonDecode(res.body);
-      
       if (res.statusCode == 200) {
         currentUser = data;
-        bool isAdmin = data['is_admin'] ?? false;
+        
+        // ==========================================
+        // NEW: GRAB THE TOKEN AND SEND TO BACKEND
+        // ==========================================
+        try {
+          String? fcmToken = await FirebaseMessaging.instance.getToken();
+          if (fcmToken != null) {
+            await http.post(
+              Uri.parse('https://huramay-app.onrender.com/api/user/update_token'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'user_id': data['id'],
+                'fcm_token': fcmToken
+              }),
+            );
+            print("Successfully registered device token for push notifications!");
+          }
+        } catch (e) {
+          print("Warning: Failed to get/send FCM token: $e");
+        }
+        // ==========================================
 
+        bool isAdmin = data['is_admin'] ?? false;
+        showSuccessToast(context, "Welcome back!");
+        
         if (isAdmin) {
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const AdminDashboard()));
         } else {
           Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const DashboardScreen()));
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'])));
+        showErrorToast(context, data['message']);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Connection Error")));
+      showErrorToast(context, "Connection Error. Please check your internet.");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  // NEW: Helper method to support validators and the eye icon
-  Widget _buildValidatedInput(TextEditingController ctrl, {bool isPass = false, String? Function(String?)? validator}) {
-    return TextFormField(
-      controller: ctrl,
-      obscureText: isPass ? _obscurePass : false,
-      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-        errorStyle: const TextStyle(color: Color.fromARGB(255, 255, 0, 0), fontWeight: FontWeight.bold, fontSize: 13),
-        suffixIcon: isPass ? IconButton(
-          icon: Icon(_obscurePass ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
-          onPressed: () => setState(() => _obscurePass = !_obscurePass),
-        ) : null,
-      ),
-      validator: validator,
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: figmaBackground(),
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Form( // NEW: Wrapped in Form
-            key: _formKey,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text("Huramay", style: TextStyle(fontSize: 45, color: Colors.white, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 40),
-                const Text("Login", style: TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 30),
-                
-                figmaLabel("Email"),
-                _buildValidatedInput(_emailCtrl, validator: (value) {
-                  if (value == null || value.isEmpty) return 'Please enter your email';
-                  return null;
-                }),
-                
-                const SizedBox(height: 10),
-                
-                figmaLabel("Password"),
-                _buildValidatedInput(_passCtrl, isPass: true, validator: (value) {
-                  if (value == null || value.isEmpty) return 'Please enter your password';
-                  return null;
-                }),
-                
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text("Don't have an account? ", style: TextStyle(color: Colors.white)),
-                    GestureDetector(
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const SignUpScreen())),
-                      child: const Text("SignUp", style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
-                    )
-                  ],
-                ),
-                const SizedBox(height: 40),
-                figmaButton("Login", doLogin),
-              ],
+      backgroundColor: const Color(0xFFF8FAFC), 
+      body: Stack(
+        children: [
+          Positioned(
+            top: -100,
+            right: -50,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withOpacity(0.04)),
             ),
           ),
-        ),
+          Positioned(
+            top: 150,
+            left: -100,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: accentYellow.withOpacity(0.05)),
+            ),
+          ),
+          
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // --- NEW LOGO IMPLEMENTATION ---
+                    Center(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16), // Gives the logo smooth corners
+                        child: Image.asset('assets/images/huramay_logo.png', height: 90),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text("Huramay", textAlign: TextAlign.center, style: TextStyle(fontSize: 36, color: primaryBlue, fontWeight: FontWeight.w900, letterSpacing: -1.0)),
+                    const SizedBox(height: 8),
+                    const Text("Sign in to your account", textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: textLight)),
+                    const SizedBox(height: 40),
+                    
+                    Container(
+                      padding: const EdgeInsets.all(32),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24), 
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 24, offset: const Offset(0, 10)),
+                        ],
+                        border: Border.all(color: Colors.grey.shade100, width: 1.5),
+                      ),
+                      child: Form( 
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text("Email", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: _emailCtrl,
+                              style: const TextStyle(color: textDark, fontWeight: FontWeight.w500),
+                              decoration: modernInputDecoration("@gmail.com"),
+                              validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                            ),
+                            const SizedBox(height: 20),
+                            
+                            const Text("Password", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: _passCtrl,
+                              obscureText: _obscurePass,
+                              style: const TextStyle(color: textDark, fontWeight: FontWeight.w500),
+                              decoration: modernInputDecoration("••••••••", suffixIcon: IconButton(
+                                icon: Icon(_obscurePass ? Icons.visibility_off : Icons.visibility, color: textLight, size: 20),
+                                onPressed: () => setState(() => _obscurePass = !_obscurePass),
+                              )),
+                              validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                            ),
+                            const SizedBox(height: 32),
+                            
+                            SizedBox(
+                              height: 52,
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : doLogin,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primaryBlue,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                child: _isLoading 
+                                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: accentYellow, strokeWidth: 2))
+                                  : const Text("Sign In", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text("Don't have an account? ", style: TextStyle(color: textLight)),
+                        GestureDetector(
+                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const SignUpScreen())),
+                          child: const Text("Create one", style: TextStyle(color: primaryBlue, fontWeight: FontWeight.bold)),
+                        )
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -146,147 +293,176 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _confCtrl = TextEditingController();
   String? _selectedDept;
   
-  // NEW: Added FormKey and visibility booleans
   final _formKey = GlobalKey<FormState>();
   bool _obscurePass = true;
   bool _obscureConf = true;
+  bool _isLoading = false;
 
   final List<String> _lnuDepartments = [
     'Bachelor of Elementary Education', 'Bachelor of Early Childhood Education', 'Bachelor of Special Needs Education', 'Bachelor of Technology and Livelihood Education', 'Bachelor of Physical Education', 'Bachelor of Secondary Education major in English', 'Bachelor of Secondary Education major in Filipino', 'Bachelor of Secondary Education major in Mathematics', 'Bachelor of Secondary Education major in Science', 'Bachelor of Secondary Education major in Social Studies', 'Bachelor of Secondary Education major in Values Education', 'Teacher Certificate Program (TCP)', 'Bachelor of Library and Information Science', 'Bachelor of Arts in Communication', 'Bachelor of Music in Music Education', 'Bachelor of Science in Information Technology', 'Bachelor of Arts in English Language', 'Bachelor of Arts in Political Science', 'Bachelor of Science in Biology', 'Bachelor of Science in Social Work', 'Bachelor of Science in Tourism Management', 'Bachelor of Science in Hospitality Management', 'Bachelor of Science in Entrepreneurship', 'Faculty / Staff'
   ];
 
   Future<void> doSignup() async {
-    // NEW: Trigger validators (Regex for emojis, special chars, matching passwords)
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      showErrorToast(context, "Please fix the form errors before submitting.");
+      return;
+    }
     if (_selectedDept == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please select a department")));
+      showErrorToast(context, "Please select your department from the dropdown.");
       return;
     }
     
+    setState(() => _isLoading = true);
     String emailInput = _emailCtrl.text.trim().toLowerCase();
     
     try {
       var res = await http.post(
         Uri.parse('https://huramay-app.onrender.com/api/register'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'full_name': _nameCtrl.text, 'email': emailInput, 'department': _selectedDept, 'password': _passCtrl.text}),
+        body: jsonEncode({'full_name': _nameCtrl.text.trim(), 'email': emailInput, 'department': _selectedDept, 'password': _passCtrl.text}),
       );
-      
-      if (!mounted) return; // FIX: Prevent BuildContext across async gaps warning
+      if (!mounted) return;
 
       if (res.statusCode == 201) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Account created! Please log in.")));
+        showSuccessToast(context, "Account created! Please log in.");
       } else {
         var data = jsonDecode(res.body);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'])));
+        showErrorToast(context, data['message']);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Connection Error")));
+      showErrorToast(context, "Connection Error. Please check your internet.");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  // NEW: Helper method to support validators and the eye icon
-  Widget _buildValidatedInput(TextEditingController ctrl, {bool isPass = false, bool? obscure, VoidCallback? onToggle, String? Function(String?)? validator}) {
-    return TextFormField(
-      controller: ctrl,
-      obscureText: obscure ?? false,
-      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-        suffixIcon: isPass ? IconButton(
-          icon: Icon(obscure! ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
-          onPressed: onToggle,
-        ) : null,
-      ),
-      validator: validator,
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: figmaBackground(),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(40),
-          child: Form( // NEW: Wrapped in Form
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 60),
-                const Center(child: Text("Huramay", style: TextStyle(fontSize: 45, color: Colors.white, fontWeight: FontWeight.bold))),
-                const SizedBox(height: 10),
-                const Center(child: Text("SignUp", style: TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.bold))),
-                const SizedBox(height: 30),
-                
-                // NAME VALIDATION
-                figmaLabel("Full Name"),
-                _buildValidatedInput(_nameCtrl, validator: (value) {
-                  if (value == null || value.isEmpty) return 'Please enter your name';
-                  if (!RegExp(r'^[a-zA-Z\s\.]+$').hasMatch(value)) return 'No numbers, special characters, or emoji';
-                  return null;
-                }),
-                const SizedBox(height: 10),
-
-                // EMAIL VALIDATION
-                figmaLabel("Email"),
-                _buildValidatedInput(_emailCtrl, validator: (value) {
-                  if (value == null || value.isEmpty) return 'Please enter your email';
-                  bool hasEmoji = RegExp(r'[\u00A9\u00AE\u2000-\u3300\ud83c\ud000-\ud83c\udfff\ud83d\ud000-\ud83d\udfff\ud83e\ud000-\ud83e\udfff]').hasMatch(value);
-                  bool hasSpecialChars = value.contains(RegExp(r'[!#\$%^&*() \?":{}|<>]'));
-                  if (hasEmoji || hasSpecialChars) return 'No special characters other @ or emoji allowed';
-                  if (!value.toLowerCase().endsWith('@gmail.com')) return 'Email must end with @gmail.com';
-                  return null;
-                }),
-                const SizedBox(height: 10),
-
-                // DEPARTMENT
-                figmaLabel("Department"),
-                Container(
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 3),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      value: _selectedDept,
-                      hint: const Text("Select program", style: TextStyle(fontSize: 14, color: Colors.black54)),
-                      items: _lnuDepartments.map((d) => DropdownMenuItem(value: d, child: Text(d, style: const TextStyle(fontSize: 12, color: Colors.black, fontWeight: FontWeight.bold)))).toList(),
-                      onChanged: (v) => setState(() => _selectedDept = v),
-                      decoration: const InputDecoration(border: InputBorder.none),
-                      validator: (value) => value == null ? 'Please select a department' : null,
-                    ),
-                  ),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: textDark),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 10),
+        child: Form( 
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // --- NEW LOGO IMPLEMENTATION ---
+              Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.asset('assets/images/huramay_logo.png', height: 70),
                 ),
-                const SizedBox(height: 10),
-
-                // PASSWORD VALIDATION + EYE ICON
-                figmaLabel("Password"),
-                _buildValidatedInput(_passCtrl, isPass: true, obscure: _obscurePass, onToggle: () => setState(() => _obscurePass = !_obscurePass), validator: (value) {
-                  if (value == null || value.isEmpty) return 'Please enter a password';
-                  if (RegExp(r'[\u00A9\u00AE\u2000-\u3300\ud83c\ud000-\ud83c\udfff\ud83d\ud000-\ud83d\udfff\ud83e\ud000-\ud83e\udfff]').hasMatch(value)) return 'Password cannot contain emojis';
+              ),
+              const SizedBox(height: 24),
+              const Text("Create Account", style: TextStyle(fontSize: 32, color: primaryBlue, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+              const SizedBox(height: 8),
+              const Text("Join Huramay to get started", style: TextStyle(fontSize: 16, color: textLight)),
+              const SizedBox(height: 40),
+              
+              const Text("Full Name", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _nameCtrl,
+                style: const TextStyle(color: textDark, fontWeight: FontWeight.w500),
+                decoration: modernInputDecoration("John Doe"),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Required';
+                  if (!RegExp(r'^[a-zA-Z\s\.]+$').hasMatch(v)) return 'No numbers or special characters';
                   return null;
-                }),
-                const SizedBox(height: 10),
+                },
+              ),
+              const SizedBox(height: 20),
 
-                // CONFIRM PASSWORD VALIDATION + EYE ICON
-                figmaLabel("Confirm Password"),
-                _buildValidatedInput(_confCtrl, isPass: true, obscure: _obscureConf, onToggle: () => setState(() => _obscureConf = !_obscureConf), validator: (value) {
-                  if (value == null || value.isEmpty) return 'Please confirm your password';
-                  if (value != _passCtrl.text) return 'Passwords do not match';
+              const Text("Email", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _emailCtrl,
+                style: const TextStyle(color: textDark, fontWeight: FontWeight.w500),
+                decoration: modernInputDecoration("@gmail.com"),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Required';
+                  bool hasEmoji = RegExp(r'[\u00A9\u00AE\u2000-\u3300\ud83c\ud000-\ud83c\udfff\ud83d\ud000-\ud83d\udfff\ud83e\ud000-\ud83e\udfff]').hasMatch(v);
+                  bool hasSpecialChars = v.contains(RegExp(r'[!#\$%^&*() \?":{}|<>]'));
+                  if (hasEmoji || hasSpecialChars) return 'No special chars or emoji allowed';
+                  if (!v.toLowerCase().endsWith('@gmail.com')) return 'Must end with @gmail.com'; 
                   return null;
-                }),
-                
-                const SizedBox(height: 40),
-                Center(child: figmaButton("SignUp", doSignup)),
-              ],
-            ),
+                },
+              ),
+              const SizedBox(height: 20),
+
+              const Text("Department", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                isExpanded: true,
+                value: _selectedDept,
+                hint: const Text("Select program", style: TextStyle(color: textLight, fontSize: 14)),
+                icon: const Icon(Icons.expand_more, color: textLight),
+                items: _lnuDepartments.map((d) => DropdownMenuItem(value: d, child: Text(d, style: const TextStyle(fontSize: 14, color: textDark, fontWeight: FontWeight.w500)))).toList(),
+                onChanged: (v) => setState(() => _selectedDept = v),
+                decoration: modernInputDecoration(""),
+              ),
+              const SizedBox(height: 20),
+
+              const Text("Password", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _passCtrl,
+                obscureText: _obscurePass,
+                style: const TextStyle(color: textDark, fontWeight: FontWeight.w500),
+                decoration: modernInputDecoration("••••••••", suffixIcon: IconButton(
+                  icon: Icon(_obscurePass ? Icons.visibility_off : Icons.visibility, color: textLight, size: 20),
+                  onPressed: () => setState(() => _obscurePass = !_obscurePass),
+                )),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Required';
+                  if (RegExp(r'[\u00A9\u00AE\u2000-\u3300\ud83c\ud000-\ud83c\udfff\ud83d\ud000-\ud83d\udfff\ud83e\ud000-\ud83e\udfff]').hasMatch(v)) return 'Cannot contain emojis';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 20),
+
+              const Text("Confirm Password", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _confCtrl,
+                obscureText: _obscureConf,
+                style: const TextStyle(color: textDark, fontWeight: FontWeight.w500),
+                decoration: modernInputDecoration("••••••••", suffixIcon: IconButton(
+                  icon: Icon(_obscureConf ? Icons.visibility_off : Icons.visibility, color: textLight, size: 20),
+                  onPressed: () => setState(() => _obscureConf = !_obscureConf),
+                )),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Required';
+                  if (v != _passCtrl.text) return 'Passwords do not match';
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 40),
+              SizedBox(
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : doSignup,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryBlue,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: _isLoading 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: accentYellow, strokeWidth: 2))
+                    : const Text("Create Account", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(height: 40),
+            ],
           ),
         ),
       ),
@@ -294,7 +470,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 }
 
-// ==================== PROFILE SCREEN (Modernized with Base64) ====================
+// ==================== PROFILE SCREEN ====================
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
   @override
@@ -302,8 +478,8 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // CHANGED: We now store the Base64 string instead of a local file path
   String? _imageBase64;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -312,30 +488,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (_imageBase64 != null && _imageBase64!.isEmpty) _imageBase64 = null;
   }
 
-  // CHANGED: Converts the chosen image into Base64 text
   Future<void> _pickImage() async {
-    final image = await ImagePicker().pickImage(source: ImageSource.gallery);
+    // VAVT-87: Compress the image instantly when the user picks it
+    final image = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 20, // Compresses the file size by 80%
+      maxWidth: 400,    // Shrinks the dimensions so it isn't 4K
+      maxHeight: 400,
+    );
+    
     if (image != null) {
       final bytes = await File(image.path).readAsBytes();
       setState(() {
-        _imageBase64 = base64Encode(bytes); // Convert to text!
+        _imageBase64 = base64Encode(bytes);
       });
     }
   }
 
   Future<void> _saveProfile() async {
+    setState(() => _isLoading = true);
     try {
       var res = await http.post(
         Uri.parse('https://huramay-app.onrender.com/api/user/update'),
         headers: {'Content-Type': 'application/json'},
-        // Send the massive text string to the database
         body: jsonEncode({'id': currentUser!['id'], 'photo_path': _imageBase64 ?? ""}),
       );
       if (res.statusCode == 200) {
-        currentUser!['photo_path'] = _imageBase64; // Update the current user data
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Profile Saved!")));
+        currentUser!['photo_path'] = _imageBase64; 
+        if (mounted) showSuccessToast(context, "Profile Saved");
+      } else {
+        if (mounted) showErrorToast(context, "Failed to save profile.");
       }
-    } catch (e) {}
+    } catch (e) {
+      if (mounted) showErrorToast(context, "Connection error.");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   void _logout() {
@@ -348,194 +536,164 @@ class _ProfileScreenState extends State<ProfileScreen> {
     double rating = (currentUser?['rating'] ?? 0.0).toDouble();
     List<Widget> stars = List.generate(5, (index) => Icon(
       index < rating ? Icons.star : Icons.star_border, 
-      color: Colors.amber, 
-      size: 28
+      color: accentYellow, 
+      size: 20
     ));
     
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A0088),
+        backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text("My Profile", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        iconTheme: const IconThemeData(color: textDark),
+        title: const Text("Profile", style: TextStyle(color: textDark, fontWeight: FontWeight.bold, fontSize: 18)),
         centerTitle: true,
+        bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(color: borderGrey, height: 1)),
       ),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.all(25),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
         child: Column(
           children: [
-            // 1. Modern Interactive Avatar
             Center(
               child: Stack(
                 children: [
                   Container(
-                    width: 130,
-                    height: 130,
+                    width: 100,
+                    height: 100,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF3F4F6),
+                      color: Colors.grey.shade100,
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFF1A0088), width: 3),
-                      // CHANGED: Decodes the Base64 text back into an image
+                      border: Border.all(color: borderGrey, width: 1),
                       image: (_imageBase64 != null && _imageBase64!.isNotEmpty)
-                        ? DecorationImage(
-                            image: MemoryImage(base64Decode(_imageBase64!)), 
-                            fit: BoxFit.cover
-                          ) 
+                        ? DecorationImage(image: MemoryImage(base64Decode(_imageBase64!)), fit: BoxFit.cover) 
                         : null,
                     ),
                     child: (_imageBase64 == null || _imageBase64!.isEmpty) 
-                      ? const Icon(Icons.person, size: 65, color: Colors.grey) 
+                      ? const Icon(Icons.person, size: 40, color: textLight) 
                       : null,
                   ),
                   Positioned(
                     bottom: 0,
-                    right: 5,
+                    right: 0,
                     child: GestureDetector(
                       onTap: _pickImage,
                       child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.yellow,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2)
-                        ),
-                        child: const Icon(Icons.camera_alt, color: Colors.black, size: 22),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: borderGrey, width: 1)),
+                        child: const Icon(Icons.camera_alt, color: primaryBlue, size: 16),
                       ),
                     ),
                   )
                 ],
               ),
             ),
-            const SizedBox(height: 35),
+            const SizedBox(height: 32),
 
-            // 2. User Information Card
             Container(
-              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFFF3F4F6),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.black12),
+                border: Border.all(color: borderGrey),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
                 children: [
-                  _modernProfileRow("Full Name", currentUser?['full_name'] ?? "Unknown", Icons.person_outline),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Divider(height: 1, thickness: 1, color: Colors.black12),
-                  ),
-                  _modernProfileRow("Email", currentUser?['email'] ?? "Unknown", Icons.email_outlined),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Divider(height: 1, thickness: 1, color: Colors.black12),
-                  ),
-                  _modernProfileRow("Department", currentUser?['department'] ?? "Unknown", Icons.business_outlined),
+                  _modernProfileRow("Full Name", currentUser?['full_name'] ?? "Unknown"),
+                  const Divider(height: 1, thickness: 1, color: borderGrey),
+                  _modernProfileRow("Email", currentUser?['email'] ?? "Unknown"),
+                  const Divider(height: 1, thickness: 1, color: borderGrey),
+                  _modernProfileRow("Department", currentUser?['department'] ?? "Unknown"),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
-            // 3. Trust Rating Highlight Box
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: Colors.blue.shade200),
+                color: Colors.grey.shade50,
+                border: Border.all(color: borderGrey),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text("Trust Rating", style: TextStyle(color: Color(0xFF1A0088), fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Text("Trust Rating", style: TextStyle(color: textDark, fontWeight: FontWeight.bold, fontSize: 14)),
                   Row(children: stars),
                 ],
               ),
             ),
-            const SizedBox(height: 35),
+            const SizedBox(height: 40),
 
-            // 4. Action Buttons
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(context, MaterialPageRoute(builder: (c) => const PasswordResetScreen()));
-              },
-              icon: const Icon(Icons.lock_reset),
-              label: const Text("Reset Password", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1A0088),
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 55),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                elevation: 0,
+            OutlinedButton(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const PasswordResetScreen())),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: textDark,
+                side: const BorderSide(color: borderGrey),
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
+              child: const Text("Change Password", style: TextStyle(fontWeight: FontWeight.w600)),
             ),
-            const SizedBox(height: 15),
+            const SizedBox(height: 16),
 
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton.icon(
+                  child: TextButton(
                     onPressed: _logout,
-                    icon: const Icon(Icons.logout, size: 20),
-                    label: const Text("Logout", style: TextStyle(fontWeight: FontWeight.bold)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: const BorderSide(color: Colors.red, width: 1.5),
-                      minimumSize: const Size(0, 55),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.red.shade600,
+                      minimumSize: const Size(0, 50),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
+                    child: const Text("Sign Out", style: TextStyle(fontWeight: FontWeight.w600)),
                   ),
                 ),
-                const SizedBox(width: 15),
+                const SizedBox(width: 16),
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _saveProfile,
-                    icon: const Icon(Icons.save, size: 20),
-                    label: const Text("Save", style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _saveProfile,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.yellow,
-                      foregroundColor: Colors.black,
+                      backgroundColor: primaryBlue,
+                      foregroundColor: Colors.white,
                       elevation: 0,
-                      minimumSize: const Size(0, 55),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                      minimumSize: const Size(0, 50),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
+                    child: _isLoading 
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: accentYellow, strokeWidth: 2)) 
+                      : const Text("Save Changes", style: TextStyle(fontWeight: FontWeight.w600)),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 30)
+            const SizedBox(height: 40)
           ],
         ),
       ),
     );
   }
 
-  Widget _modernProfileRow(String label, String value, IconData icon) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: Colors.black12)),
-          child: Icon(icon, color: const Color(0xFF1A0088), size: 20),
-        ),
-        const SizedBox(width: 15),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: const TextStyle(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 3),
-              Text(value, style: const TextStyle(fontSize: 14, color: Colors.black87, fontWeight: FontWeight.bold)),
-            ],
+  Widget _modernProfileRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(label, style: const TextStyle(fontSize: 13, color: textLight, fontWeight: FontWeight.w500)),
           ),
-        )
-      ],
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 14, color: textDark, fontWeight: FontWeight.w600), textAlign: TextAlign.right),
+          )
+        ],
+      ),
     );
   }
 }
 
-// ==================== PASSWORD RESET SCREEN (Modernized) ====================
+// ==================== PASSWORD RESET SCREEN ====================
 class PasswordResetScreen extends StatefulWidget {
   const PasswordResetScreen({super.key});
   @override
@@ -546,9 +704,18 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _confCtrl = TextEditingController();
+  bool _isLoading = false;
 
   Future<void> doReset() async {
-    if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty || _passCtrl.text != _confCtrl.text) return;
+    if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
+      showErrorToast(context, "Please fill in all fields.");
+      return;
+    }
+    if (_passCtrl.text != _confCtrl.text) {
+      showErrorToast(context, "New passwords do not match.");
+      return;
+    }
+    setState(() => _isLoading = true);
     try {
       var res = await http.post(
         Uri.parse('https://huramay-app.onrender.com/api/user/reset_password'),
@@ -556,8 +723,18 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
         body: jsonEncode({'email': _emailCtrl.text, 'new_password': _passCtrl.text, 'current_user_id': currentUser!['id']}),
       );
       if (!mounted) return;
-      if (res.statusCode == 200) Navigator.pop(context);
-    } catch (e) {}
+      if (res.statusCode == 200) {
+        showSuccessToast(context, "Password updated successfully.");
+        Navigator.pop(context);
+      } else {
+        var data = jsonDecode(res.body);
+        showErrorToast(context, data['message'] ?? "Failed to reset password.");
+      }
+    } catch (e) {
+      showErrorToast(context, "Connection error.");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -565,65 +742,56 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1A0088),
+        backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: const Text("Reset Password", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        iconTheme: const IconThemeData(color: textDark),
+        title: const Text("Security", style: TextStyle(color: textDark, fontWeight: FontWeight.bold, fontSize: 18)),
         centerTitle: true,
+        bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(color: borderGrey, height: 1)),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(30),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text("Security Settings", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1A0088))),
-            const SizedBox(height: 30),
-            
-            _modernResetLabel("Email Address"),
-            _modernResetInput(_emailCtrl),
-            const SizedBox(height: 15),
-            
-            _modernResetLabel("New Password"),
-            _modernResetInput(_passCtrl, isPass: true),
-            const SizedBox(height: 15),
-            
-            _modernResetLabel("Confirm Password"),
-            _modernResetInput(_confCtrl, isPass: true),
+            const Text("Update Password", style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: textDark, letterSpacing: -0.5)),
+            const SizedBox(height: 8),
+            const Text("Ensure your account is using a secure password.", style: TextStyle(fontSize: 14, color: textLight)),
             const SizedBox(height: 40),
             
-            ElevatedButton(
-              onPressed: doReset,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.yellow,
-                foregroundColor: Colors.black,
-                minimumSize: const Size(double.infinity, 55),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                elevation: 0,
+            const Text("Email Address", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+            const SizedBox(height: 8),
+            TextField(controller: _emailCtrl, decoration: modernInputDecoration("Enter registered email")),
+            const SizedBox(height: 20),
+            
+            const Text("New Password", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+            const SizedBox(height: 8),
+            TextField(controller: _passCtrl, obscureText: true, decoration: modernInputDecoration("••••••••")),
+            const SizedBox(height: 20),
+            
+            const Text("Confirm Password", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+            const SizedBox(height: 8),
+            TextField(controller: _confCtrl, obscureText: true, decoration: modernInputDecoration("••••••••")),
+            const SizedBox(height: 40),
+            
+            SizedBox(
+              height: 50,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : doReset,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryBlue,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: _isLoading 
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: accentYellow, strokeWidth: 2)) 
+                  : const Text("Save Password", style: TextStyle(fontWeight: FontWeight.w600)),
               ),
-              child: const Text("Update Password", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             )
           ],
         ),
       ),
     );
   }
-
-  Widget _modernResetLabel(String text) => Padding(
-    padding: const EdgeInsets.only(left: 5, bottom: 8),
-    child: Text(text, style: const TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.bold)),
-  );
-
-  Widget _modernResetInput(TextEditingController ctrl, {bool isPass = false}) => TextField(
-    controller: ctrl,
-    obscureText: isPass,
-    style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
-    decoration: InputDecoration(
-      filled: true,
-      fillColor: const Color(0xFFF3F4F6),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.black12)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.black12)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Color(0xFF1A0088), width: 1.5)),
-    ),
-  );
 }

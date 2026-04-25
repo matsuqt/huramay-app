@@ -13,6 +13,14 @@ import '../screens/history_screen.dart';
 import '../screens/admin_dashboard.dart'; 
 import '../screens/reports_screen.dart';
 
+// ==================== SHARED DESIGN CONSTANTS ====================
+const Color primaryBlue = Color(0xFF1A0088);
+const Color accentYellow = Color(0xFFFFD700);
+const Color textDark = Color(0xFF1F2937);
+const Color textLight = Color(0xFF6B7280);
+const Color borderGrey = Color(0xFFE5E7EB);
+const Color bgGray = Color(0xFFF8FAFC);
+
 // ==================== GLOBAL SIDEBAR ====================
 class AppSidebar extends StatefulWidget {
   const AppSidebar({super.key});
@@ -33,7 +41,6 @@ class _AppSidebarState extends State<AppSidebar> {
   Future<void> _fetchUnreadCount() async {
     if (currentUser == null) return;
     try {
-      // FIXED: Now uses https://huramay-app.onrender.com so it never breaks when your Wi-Fi changes!
       final res = await http.get(Uri.parse('https://huramay-app.onrender.com/api/messages/unread/${currentUser!['id']}'));
       if (res.statusCode == 200) {
         if (mounted) {
@@ -51,60 +58,120 @@ class _AppSidebarState extends State<AppSidebar> {
   Widget build(BuildContext context) {
     bool isAdmin = currentUser?['is_admin'] ?? false; 
     
-    // Extracting initials for the modern avatar
     String userName = currentUser?['full_name'] ?? "User";
     String initial = userName.isNotEmpty ? userName[0].toUpperCase() : "U";
+    
+    // VAVT-84: Check for user profile image
+    String? photoBase64 = currentUser?['photo_path'];
+    bool hasPhoto = photoBase64 != null && photoBase64.isNotEmpty;
 
     return Drawer(
-      backgroundColor: Colors.white, // Clean white background
+      backgroundColor: bgGray, 
+      elevation: 0,
       child: Column(
         children: [
-          // Modern User Header in LNU Blue
-          UserAccountsDrawerHeader(
+          // 1. Modern Custom Branded Header 
+          Container(
+            padding: const EdgeInsets.fromLTRB(24, 50, 24, 24), 
             decoration: const BoxDecoration(
-              color: Color(0xFF1A0088),
+              color: Colors.white,
+              border: Border(bottom: BorderSide(color: borderGrey, width: 1)),
             ),
-            accountName: Text(
-              userName, 
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)
-            ),
-            accountEmail: Text(
-              currentUser?['department'] ?? "No Department",
-              style: const TextStyle(fontSize: 12, color: Colors.white70),
-            ),
-            currentAccountPicture: CircleAvatar(
-              backgroundColor: Colors.white,
-              child: Text(
-                initial,
-                style: const TextStyle(
-                  fontSize: 24, 
-                  color: Color(0xFF1A0088), 
-                  fontWeight: FontWeight.bold
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // --- THE BRAND LOCKUP (Logo + Text) ---
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.asset('assets/images/huramay_logo.png', height: 28), 
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      "Huramay",
+                      style: TextStyle(
+                        fontSize: 22, 
+                        fontWeight: FontWeight.w900, 
+                        color: primaryBlue, 
+                        letterSpacing: -0.5
+                      ),
+                    ),
+                  ],
                 ),
-              ),
+                const SizedBox(height: 32), 
+                
+                // --- USER PROFILE ROW ---
+                Row(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: primaryBlue.withOpacity(0.08),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: primaryBlue.withOpacity(0.15), width: 1),
+                        // VAVT-84: Apply the image if it exists
+                        image: hasPhoto 
+                          ? DecorationImage(image: MemoryImage(base64Decode(photoBase64)), fit: BoxFit.cover) 
+                          : null,
+                      ),
+                      alignment: Alignment.center,
+                      // Hide the text initial if we have a photo
+                      child: !hasPhoto ? Text(
+                        initial,
+                        style: const TextStyle(fontSize: 22, color: primaryBlue, fontWeight: FontWeight.bold),
+                      ) : null,
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            userName, 
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: textDark, letterSpacing: -0.3),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            currentUser?['department'] ?? "No Department",
+                            style: const TextStyle(fontSize: 12, color: textLight, fontWeight: FontWeight.w500),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
           
+          // 2. Menu Items List
           Expanded(
             child: ListView(
-              padding: EdgeInsets.zero,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              physics: const BouncingScrollPhysics(),
               children: [
                 _modernMenuBtn(context, "Dashboard", Icons.dashboard_outlined),
                 _modernMenuBtn(context, "My Items", Icons.inventory_2_outlined),
                 _modernMenuBtn(context, "Department Filters", Icons.filter_list),
                 _modernMenuBtn(context, "Favorites", Icons.favorite_border),
-
                 
-                // Messages with a modern badge
+                // Messages with modern pill badge
                 _modernMenuBtn(
                   context, "Messages", Icons.message_outlined, 
                   trailing: unreadCount > 0 
                     ? Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.red.shade200)),
                         child: Text(
                           unreadCount.toString(), 
-                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)
+                          style: TextStyle(color: Colors.red.shade700, fontSize: 11, fontWeight: FontWeight.bold)
                         ),
                       )
                     : null
@@ -112,18 +179,17 @@ class _AppSidebarState extends State<AppSidebar> {
                 
                 _modernMenuBtn(context, "History", Icons.history),
                 _modernMenuBtn(context, "Requests", Icons.notifications_none),
-
                 _modernMenuBtn(context, "Reports", Icons.report_gmailerrorred),
                 
-                // Admin Section (Only Admins see the Admin Panel)
+                // Admin Section
                 if (isAdmin) ...[
                   const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    child: Divider(color: Colors.black12, thickness: 1),
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    child: Divider(color: borderGrey, thickness: 1),
                   ),
                   const Padding(
-                    padding: EdgeInsets.only(left: 20, bottom: 5),
-                    child: Text("ADMIN CONTROLS", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1.2)),
+                    padding: EdgeInsets.only(left: 24, bottom: 8),
+                    child: Text("ADMIN CONTROLS", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: textLight, letterSpacing: 1.2)),
                   ),
                   _modernMenuBtn(context, "Admin Panel", Icons.admin_panel_settings_outlined, isHighlight: true),
                 ],
@@ -131,62 +197,64 @@ class _AppSidebarState extends State<AppSidebar> {
             ),
           ),
           
-          // Logout anchored at the bottom
-          const Divider(color: Colors.black12, thickness: 1),
-          _modernMenuBtn(context, "Logout", Icons.logout, isLogout: true),
-          const SizedBox(height: 20),
+          // 3. Logout anchored at the bottom
+          const Divider(color: borderGrey, thickness: 1, height: 1),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            child: _modernMenuBtn(context, "Logout", Icons.logout, isLogout: true),
+          ),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  // Modernized Menu Button Logic
+  // Modernized Pill-Shaped Menu Button
   Widget _modernMenuBtn(BuildContext context, String title, IconData icon, {bool isLogout = false, bool isHighlight = false, Widget? trailing}) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 25),
-      leading: Icon(
-        icon, 
-        size: 24, 
-        color: isLogout ? Colors.red : (isHighlight ? const Color(0xFF1A0088) : Colors.black87)
+    Color itemColor = isLogout ? Colors.red.shade600 : (isHighlight ? primaryBlue : textDark);
+    Color iconColor = isLogout ? Colors.red.shade500 : (isHighlight ? primaryBlue : textLight);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      child: ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        leading: Icon(icon, size: 22, color: iconColor),
+        title: Text(
+          title, 
+          style: TextStyle(color: itemColor, fontWeight: FontWeight.w600, fontSize: 14)
+        ),
+        trailing: trailing,
+        onTap: () {
+          if (isLogout) {
+            currentUser = null;
+            Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const LoginScreen()), (route) => false);
+          } else if (title == "Admin Panel") {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const AdminDashboard()));
+          } else if (title == "My Items") {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const MyItemsScreen()));
+          } else if (title == "Dashboard") {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const DashboardScreen()));
+          } else if (title == "Department Filters") {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const DepartmentScreen()));
+          } else if (title == "Favorites") {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const FavoritesScreen()));
+          } else if (title == "Messages") {
+            Navigator.pop(context); 
+            Navigator.push(context, MaterialPageRoute(builder: (c) => const ChatInboxScreen()));
+          } else if (title == "History") {
+            Navigator.pop(context);
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const HistoryScreen()));
+          } else if (title == "Requests") {
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const RequestsScreen()));
+          } else if (title == "Reports") { 
+            Navigator.pop(context); 
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const ReportsScreen()));
+          } else {
+            Navigator.pop(context); 
+          }
+        },
       ),
-      title: Text(
-        title, 
-        style: TextStyle(
-          color: isLogout ? Colors.red : (isHighlight ? const Color(0xFF1A0088) : Colors.black87), 
-          fontWeight: FontWeight.w600, 
-          fontSize: 15
-        )
-      ),
-      trailing: trailing,
-      onTap: () {
-        if (isLogout) {
-          currentUser = null;
-          Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (c) => const LoginScreen()), (route) => false);
-        } else if (title == "Admin Panel") {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const AdminDashboard()));
-        } else if (title == "My Items") {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const MyItemsScreen()));
-        } else if (title == "Dashboard") {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const DashboardScreen()));
-        } else if (title == "Department Filters") {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const DepartmentScreen()));
-        } else if (title == "Favorites") {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const FavoritesScreen()));
-        } else if (title == "Messages") {
-          Navigator.pop(context); 
-          Navigator.push(context, MaterialPageRoute(builder: (c) => const ChatInboxScreen()));
-        } else if (title == "History") {
-          Navigator.pop(context);
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const HistoryScreen()));
-        } else if (title == "Requests") {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const RequestsScreen()));
-        } else if (title == "Reports") { // FIXED: Now exactly matches the button name!
-          Navigator.pop(context); 
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const ReportsScreen()));
-        } else {
-          Navigator.pop(context); 
-        }
-      },
     );
   }
 }
