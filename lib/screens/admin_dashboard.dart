@@ -15,6 +15,16 @@ const Color textLight = Color(0xFF6B7280);
 const Color borderGrey = Color(0xFFE5E7EB);
 const Color bgGray = Color(0xFFF8FAFC);
 
+// --- THE SAFETY NET (VAVT-87) ---
+ImageProvider? _getSafeImage(String? base64Str) {
+  if (base64Str == null || base64Str.isEmpty || base64Str.length < 100) return null;
+  try {
+    return MemoryImage(base64Decode(base64Str));
+  } catch (e) {
+    return null; // Fallback to safe icon if the image is poisoned/local path
+  }
+}
+
 // =========================================================================
 // 1. ADMIN DASHBOARD WRAPPER (BOTTOM NAV BAR)
 // =========================================================================
@@ -281,8 +291,8 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
   }
 
   Widget _buildAdminCard(dynamic item) {
-    String? imgPath = item['image'];
-    bool hasImage = imgPath != null && imgPath.isNotEmpty;
+    // VAVT-87: Apply the safety net here
+    ImageProvider? safeImg = _getSafeImage(item['image']);
     bool isFlagged = item['status']?.toString().toLowerCase() == 'flagged';
 
     return GestureDetector(
@@ -306,12 +316,13 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
                 color: bgGray,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: isFlagged ? Colors.red.shade300 : borderGrey, width: 1),
-                image: hasImage ? DecorationImage(image: FileImage(File(imgPath)), fit: BoxFit.cover) : null,
+                // VAVT-87: Display the decoded image safely
+                image: safeImg != null ? DecorationImage(image: safeImg, fit: BoxFit.cover) : null,
               ),
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  if (!hasImage) const Icon(Icons.image_outlined, size: 32, color: textLight),
+                  if (safeImg == null) const Icon(Icons.image_outlined, size: 32, color: textLight),
                   if (isFlagged)
                     Container(
                       width: double.infinity, height: double.infinity,
@@ -495,6 +506,7 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
     _applySorting(); 
   }
 
+  // --- STANDARD BAN LOGIC ---
   Future<void> _executeBanUser(int userId) async {
     try {
       final res = await http.delete(Uri.parse('https://huramay-app.onrender.com/api/users/$userId'));
@@ -516,37 +528,113 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red),
+            Icon(Icons.warning_amber_rounded, color: Colors.orange),
             SizedBox(width: 8),
             Text("Ban User?", style: TextStyle(fontWeight: FontWeight.w800, color: textDark)),
           ],
         ),
-        content: Text("Are you sure you want to permanently ban '${user['full_name']}' and remove all their items?", style: const TextStyle(color: textLight, fontSize: 14)),
+        content: Text("Are you sure you want to ban '${user['full_name']}'?", style: const TextStyle(color: textLight, fontSize: 14)),
         actions: [
           OutlinedButton(
             onPressed: () => Navigator.pop(ctx),
             style: OutlinedButton.styleFrom(
-              foregroundColor: textDark,
-              side: const BorderSide(color: borderGrey, width: 1.5),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              foregroundColor: textDark, side: const BorderSide(color: borderGrey, width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text("Cancel", style: TextStyle(fontWeight: FontWeight.w600)),
+            child: const Text("Cancel"),
           ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
               _executeBanUser(user['id']);
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade600, 
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade600, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             child: const Text("Ban User", style: TextStyle(fontWeight: FontWeight.w600)),
           ),
         ],
       ),
+    );
+  }
+
+  // --- HARD DELETE LOGIC (VAVT-88) ---
+  Future<void> _executeHardDelete(int userId) async {
+    try {
+      final res = await http.delete(Uri.parse('https://huramay-app.onrender.com/api/users/$userId/hard_delete'));
+      if (res.statusCode == 200) {
+        _fetchUsers();
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User completely wiped from database.")));
+      } else {
+        final data = jsonDecode(res.body);
+        // Display backend armor error message (e.g. active borrowed items)
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'], style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red.shade800));
+      }
+    } catch (e) {
+      debugPrint("Delete error: $e");
+    }
+  }
+
+  void _showHardDeleteConfirmation(dynamic user) {
+    final TextEditingController _confirmCtrl = TextEditingController();
+    bool isMatch = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.delete_forever, color: Colors.red),
+                SizedBox(width: 8),
+                Text("HARD DELETE", style: TextStyle(fontWeight: FontWeight.w800, color: Colors.red)),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("This action is irreversible. All of '${user['full_name']}'s items and data will be destroyed.", style: const TextStyle(color: textLight, fontSize: 14)),
+                const SizedBox(height: 16),
+                const Text("Type DELETE to confirm:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: textDark)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _confirmCtrl,
+                  onChanged: (val) {
+                    setModalState(() => isMatch = val == 'DELETE');
+                  },
+                  decoration: InputDecoration(
+                    hintText: "DELETE",
+                    filled: true,
+                    fillColor: bgGray,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderGrey)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderGrey)),
+                  ),
+                )
+              ],
+            ),
+            actions: [
+              OutlinedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: textDark, side: const BorderSide(color: borderGrey, width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text("Cancel"),
+              ),
+              ElevatedButton(
+                onPressed: isMatch ? () {
+                  Navigator.pop(ctx);
+                  _executeHardDelete(user['id']);
+                } : null, // Button is disabled until 'DELETE' is typed perfectly
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700, foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                child: const Text("Permanently Delete", style: TextStyle(fontWeight: FontWeight.w600)),
+              )
+            ]
+          );
+        }
+      )
     );
   }
 
@@ -575,7 +663,6 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
       ),
       body: Stack(
         children: [
-          // Background Geometry
           Positioned(
             top: -80, right: -60,
             child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withOpacity(0.03))),
@@ -583,7 +670,6 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
           
           Column(
             children: [
-              // Search & Filter Header
               Container(
                 padding: const EdgeInsets.all(24),
                 child: Row(
@@ -591,37 +677,24 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
                     Expanded(
                       child: Container(
                         height: 44,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: borderGrey),
-                        ),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: borderGrey)),
                         child: TextField(
                           controller: _searchCtrl,
                           onChanged: (value) => _runFilter(value),
                           style: const TextStyle(fontSize: 14, color: textDark, fontWeight: FontWeight.w500),
                           decoration: const InputDecoration(
-                            hintText: "Search name, email...",
-                            hintStyle: TextStyle(fontSize: 14, color: textLight),
-                            prefixIcon: Icon(Icons.search, size: 20, color: textLight),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(vertical: 12),
+                            hintText: "Search name, email...", hintStyle: TextStyle(fontSize: 14, color: textLight),
+                            prefixIcon: Icon(Icons.search, size: 20, color: textLight), border: InputBorder.none, contentPadding: EdgeInsets.symmetric(vertical: 12),
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // Sorting Menu
                     Container(
                       height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: borderGrey),
-                      ),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: borderGrey)),
                       child: PopupMenuButton<String>(
                         icon: const Icon(Icons.sort, color: textDark, size: 22),
-                        tooltip: "Sort Users",
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         onSelected: (String newValue) {
                           setState(() => _currentSort = newValue);
@@ -638,7 +711,6 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
                 ),
               ),
 
-              // Total Count Row
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Row(
@@ -654,7 +726,6 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
               ),
               const SizedBox(height: 16),
 
-              // User List
               Expanded(
                 child: isLoading
                     ? const Center(child: CircularProgressIndicator(color: primaryBlue))
@@ -674,17 +745,13 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
                                 margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: borderGrey),
+                                  color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderGrey),
                                   boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2))],
                                 ),
                                 child: Row(
                                   children: [
                                     CircleAvatar(
-                                      radius: 24,
-                                      backgroundColor: primaryBlue.withOpacity(0.1),
-                                      foregroundColor: primaryBlue,
+                                      radius: 24, backgroundColor: primaryBlue.withOpacity(0.1), foregroundColor: primaryBlue,
                                       child: Text(initials, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                                     ),
                                     const SizedBox(width: 16),
@@ -692,11 +759,7 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            user['full_name'], 
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textDark),
-                                            maxLines: 1, overflow: TextOverflow.ellipsis,
-                                          ),
+                                          Text(user['full_name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textDark), maxLines: 1, overflow: TextOverflow.ellipsis),
                                           const SizedBox(height: 4),
                                           Text(user['email'], style: const TextStyle(fontSize: 13, color: textLight)),
                                           const SizedBox(height: 2),
@@ -704,10 +767,21 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
                                         ],
                                       ),
                                     ),
-                                    IconButton(
-                                      icon: const Icon(Icons.block, color: Colors.red, size: 24),
-                                      tooltip: "Ban User",
-                                      onPressed: () => _showBanConfirmation(user),
+                                    // DOUBLE ACTION BUTTONS
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.block, color: Colors.orange, size: 24),
+                                          tooltip: "Ban User",
+                                          onPressed: () => _showBanConfirmation(user),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete_forever, color: Colors.red, size: 24),
+                                          tooltip: "Hard Delete",
+                                          onPressed: () => _showHardDeleteConfirmation(user),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
@@ -834,8 +908,9 @@ class _AdminReportOverlayState extends State<AdminReportOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    String? imgPath = widget.itemData['image'];
-    bool hasImage = imgPath != null && imgPath.isNotEmpty;
+    // VAVT-87: Apply the safety net here too
+    ImageProvider? safeImg = _getSafeImage(widget.itemData['image']);
+    bool hasImage = safeImg != null;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -873,7 +948,8 @@ class _AdminReportOverlayState extends State<AdminReportOverlay> {
                 color: bgGray,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: borderGrey, width: 1),
-                image: hasImage ? DecorationImage(image: FileImage(File(imgPath)), fit: BoxFit.cover) : null,
+                // VAVT-87: Display safely
+                image: hasImage ? DecorationImage(image: safeImg, fit: BoxFit.cover) : null,
               ),
               child: !hasImage ? const Icon(Icons.image_outlined, size: 40, color: textLight) : null,
             ),
