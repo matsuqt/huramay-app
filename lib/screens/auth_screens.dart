@@ -1,4 +1,5 @@
 // lib/screens/auth_screens.dart
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -114,6 +115,28 @@ class _LoginScreenState extends State<LoginScreen> {
       var data = jsonDecode(res.body);
       if (res.statusCode == 200) {
         currentUser = data;
+        
+        // ==========================================
+        // NEW: GRAB THE TOKEN AND SEND TO BACKEND
+        // ==========================================
+        try {
+          String? fcmToken = await FirebaseMessaging.instance.getToken();
+          if (fcmToken != null) {
+            await http.post(
+              Uri.parse('https://huramay-app.onrender.com/api/user/update_token'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'user_id': data['id'],
+                'fcm_token': fcmToken
+              }),
+            );
+            print("Successfully registered device token for push notifications!");
+          }
+        } catch (e) {
+          print("Warning: Failed to get/send FCM token: $e");
+        }
+        // ==========================================
+
         bool isAdmin = data['is_admin'] ?? false;
         showSuccessToast(context, "Welcome back!");
         

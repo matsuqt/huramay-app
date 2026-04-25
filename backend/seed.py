@@ -5,7 +5,7 @@ import random
 fake = Faker()
 
 # The URL to your LIVE Render API
-API_URL = 'https://huramay-app.onrender.com/api/register'
+API_URL = 'http://127.0.0.1:5000/api/register'
 
 # Standard departments from your app
 DEPARTMENTS = [
