@@ -15,11 +15,9 @@ def register():
         password_input = data.get('password', '')
         full_name_input = data.get('full_name', '')
         
-        # New Security Questions
         security_color = data.get('security_color', '').strip().lower()
         security_song = data.get('security_song', '').strip().lower()
         
-        # Strict Regex Validation
         if not re.match(r'^[a-zA-Z\s\.]+$', full_name_input):
             return jsonify({"message": "Name cannot contain numbers, special characters, or emojis"}), 400
 
@@ -38,8 +36,8 @@ def register():
             email=email_input, 
             department=data['department'], 
             password=hashed_pass,
-            security_color=security_color,  # Save color
-            security_song=security_song     # Save song
+            security_color=security_color,  
+            security_song=security_song     
         )
         db.session.add(new_user)
         db.session.commit()
@@ -51,7 +49,12 @@ def register():
 def login():
     data = request.get_json()
     user = User.query.filter_by(email=data['email']).first()
+    
     if user and bcrypt.check_password_hash(user.password, data['password']):
+        # NEW: Block disabled users from logging in
+        if getattr(user, 'is_disabled', False):
+            return jsonify({"message": "Your account has been disabled by an administrator."}), 403
+            
         return jsonify({
             "id": user.id, "full_name": user.full_name, "email": user.email,               
             "department": user.department, "photo_path": user.photo_path,     
@@ -95,7 +98,6 @@ def reset_password():
     except Exception as e:
         return jsonify({"message": f"Server Error: {str(e)}"}), 500
 
-# ==================== NEW UNIVERSAL RECOVERY ROUTE ====================
 @auth_bp.route('/api/user/recover_account', methods=['POST'])
 def recover_account():
     try:
@@ -109,15 +111,15 @@ def recover_account():
         if not user:
             return jsonify({"message": "Account not found."}), 404
 
-        # Verify security questions
+        if getattr(user, 'is_disabled', False):
+            return jsonify({"message": "Account disabled. Cannot recover password."}), 403
+
         if user.security_color != color or user.security_song != song:
             return jsonify({"message": "Security question answers are incorrect."}), 401
 
-        # Check new password safety
         if re.search(r'[^\x00-\x7F]', new_password):
             return jsonify({"message": "Password cannot contain emojis"}), 400
 
-        # Hash new password and save
         user.password = bcrypt.generate_password_hash(new_password).decode('utf-8')
         db.session.commit()
 
