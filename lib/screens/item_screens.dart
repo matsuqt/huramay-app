@@ -233,7 +233,7 @@ class _DeptItemCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: borderGrey),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -336,7 +336,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       drawer: const AppSidebar(),
       body: Stack(
         children: [
-          Positioned(top: -80, right: -60, child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withOpacity(0.03)))),
+          Positioned(top: -80, right: -60, child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withValues(alpha: 0.03)))),
           
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -395,7 +395,7 @@ class _FavoriteCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderGrey),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -521,7 +521,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(color: borderGrey, width: 1),
                       image: safeImg != null ? DecorationImage(image: safeImg, fit: BoxFit.cover) : null,
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 10))],
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, 10))],
                     ),
                     child: safeImg == null ? const Icon(Icons.image_outlined, size: 64, color: textLight) : null,
                   ),
@@ -533,7 +533,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: Colors.white, shape: BoxShape.circle, border: Border.all(color: borderGrey),
-                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
+                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4))],
                         ),
                         child: Icon(_isFavorited ? Icons.favorite : Icons.favorite_border, color: _isFavorited ? Colors.red : textLight, size: 24),
                       ),
@@ -549,7 +549,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: borderGrey),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))]
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))]
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -604,7 +604,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
   Widget _detailLabel(String t) => Text(t, style: const TextStyle(color: textLight, fontWeight: FontWeight.w600, fontSize: 12, letterSpacing: 0.5));
   Widget _detailValue(String v, {bool isLight = false}) => Padding(
     padding: const EdgeInsets.only(top: 6),
-    child: Text(v, style: TextStyle(color: isLight ? textDark.withOpacity(0.8) : textDark, fontWeight: isLight ? FontWeight.w500 : FontWeight.bold, fontSize: 15, height: 1.4)),
+    child: Text(v, style: TextStyle(color: isLight ? textDark.withValues(alpha: 0.8) : textDark, fontWeight: isLight ? FontWeight.w500 : FontWeight.bold, fontSize: 15, height: 1.4)),
   );
 }
 
@@ -682,7 +682,7 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
       drawer: const AppSidebar(),
       body: Stack(
         children: [
-          Positioned(top: -80, right: -60, child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withOpacity(0.03)))),
+          Positioned(top: -80, right: -60, child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withValues(alpha: 0.03)))),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -767,7 +767,7 @@ class _MyItemCardState extends State<_MyItemCard> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderGrey),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1087,7 +1087,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
     try {
       final res = await http.post(
         Uri.parse('https://huramay-app.onrender.com/api/items'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json'},  
         body: jsonEncode({
           'title': titleText,
           'description': descText,

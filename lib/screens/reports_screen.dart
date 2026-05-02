@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
-
-import '../globals.dart';
 import '../widgets/app_sidebar.dart';
 import 'auth_screens.dart'; // Added to enable ProfileScreen routing
 
