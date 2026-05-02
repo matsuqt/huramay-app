@@ -12,7 +12,7 @@ jobs:
   # BACKEND: PYTHON TESTING
   # ==========================================
   test-backend:
-    name: Test Python Backend
+    name: Python Backend
     runs-on: ubuntu-latest
     # If your python code is in a specific folder, uncomment the next two lines:
     # defaults:
@@ -39,7 +39,7 @@ jobs:
   # FRONTEND: FLUTTER BUILD & TEST
   # ==========================================
   build-flutter:
-    name: Build Flutter App
+    name: Flutter Frontend
     runs-on: ubuntu-latest
     # If your flutter code is in a specific folder, uncomment the next two lines:
     # defaults:
