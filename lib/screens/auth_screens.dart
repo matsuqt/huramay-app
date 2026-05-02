@@ -64,7 +64,7 @@ const Color accentYellow = Color(0xFFFFD700);
 const Color textDark = Color(0xFF1F2937);
 const Color textLight = Color(0xFF6B7280);
 const Color borderGrey = Color(0xFFE5E7EB);
-const Color bgGray = Color(0xFFF8FAFC); // FIX: Added local bgGray definition
+const Color bgGray = Color(0xFFF8FAFC);
 
 InputDecoration modernInputDecoration(String hint, {Widget? suffixIcon}) {
   return InputDecoration(
@@ -78,6 +78,7 @@ InputDecoration modernInputDecoration(String hint, {Widget? suffixIcon}) {
     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: primaryBlue, width: 1.5)),
     errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.red.shade300)),
     errorStyle: TextStyle(color: Colors.red.shade400, fontWeight: FontWeight.w600, fontSize: 12),
+    errorMaxLines: 2, // Added to allow longer validation messages
     suffixIcon: suffixIcon,
   );
 }
@@ -236,7 +237,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                             const SizedBox(height: 16),
                             
-                            // Universal Forgot Password Access
                             TextButton(
                               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const UniversalRecoveryScreen())),
                               child: const Text("Forgot Password?", style: TextStyle(color: primaryBlue, fontWeight: FontWeight.bold)),
@@ -280,7 +280,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _passCtrl = TextEditingController();
   final _confCtrl = TextEditingController();
   
-  // Security Question Controllers
   final _colorCtrl = TextEditingController();
   final _songCtrl = TextEditingController();
   
@@ -408,7 +407,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
               ),
               const SizedBox(height: 32),
 
-              // --- SECURITY QUESTIONS ---
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -452,14 +450,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
               TextFormField(
                 controller: _passCtrl,
                 obscureText: _obscurePass,
+                autovalidateMode: AutovalidateMode.onUserInteraction, // Live validation as user types
                 style: const TextStyle(color: textDark, fontWeight: FontWeight.w500),
                 decoration: modernInputDecoration("••••••••", suffixIcon: IconButton(
                   icon: Icon(_obscurePass ? Icons.visibility_off : Icons.visibility, color: textLight, size: 20),
                   onPressed: () => setState(() => _obscurePass = !_obscurePass),
                 )),
                 validator: (v) {
-                  if (v == null || v.isEmpty) return 'Required';
-                  if (RegExp(r'[\u00A9\u00AE\u2000-\u3300\ud83c\ud000-\ud83c\udfff\ud83d\ud000-\ud83d\udfff\ud83e\ud000-\ud83e\udfff]').hasMatch(v)) return 'Cannot contain emojis';
+                  if (v == null || v.isEmpty) return 'Password is required';
+                  
+                  // LIVE VALIDATION CHECKS
+                  if (v.length < 8 || v.length > 12) return 'Must be between 8 and 12 characters.';
+                  if (!v.contains(RegExp(r'[A-Z]'))) return 'Must include at least 1 uppercase letter.';
+                  if (!v.contains(RegExp(r'[a-z]'))) return 'Must include at least 1 lowercase letter.';
+                  if (!v.contains(RegExp(r'[0-9]'))) return 'Must include at least 1 number.';
+                  if (!v.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>]'))) return 'Must include at least 1 special character (e.g. @, #, \$, &).';
+                  if (v.contains(RegExp(r'[^\x00-\x7F]'))) return 'Standard characters only. No emojis allowed.';
+                  
                   return null;
                 },
               ),
@@ -470,13 +477,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
               TextFormField(
                 controller: _confCtrl,
                 obscureText: _obscureConf,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 style: const TextStyle(color: textDark, fontWeight: FontWeight.w500),
                 decoration: modernInputDecoration("••••••••", suffixIcon: IconButton(
                   icon: Icon(_obscureConf ? Icons.visibility_off : Icons.visibility, color: textLight, size: 20),
                   onPressed: () => setState(() => _obscureConf = !_obscureConf),
                 )),
                 validator: (v) {
-                  if (v == null || v.isEmpty) return 'Required';
+                  if (v == null || v.isEmpty) return 'Please confirm your password';
                   if (v != _passCtrl.text) return 'Passwords do not match';
                   return null;
                 },
