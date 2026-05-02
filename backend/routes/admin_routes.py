@@ -149,3 +149,18 @@ def get_all_users():
         return jsonify(user_list), 200
     except Exception as e:
         return jsonify({"message": f"Server Error: {str(e)}"}), 500
+    
+
+# ==================== SECRET MAINTENANCE ROUTE ====================
+@admin_bp.route('/api/maintenance/rebuild-db-secret-key-123', methods=['GET'])
+def rebuild_database_live():
+    try:
+        # This executes the wipe and rebuild without needing a terminal!
+        db.drop_all() 
+        db.create_all()
+        return jsonify({
+            "status": "success",
+            "message": "LIVE DATABASE WIPED AND REBUILT SUCCESSFULLY WITH NEW COLUMNS!"
+        }), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
