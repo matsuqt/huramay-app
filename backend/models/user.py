@@ -11,7 +11,11 @@ class User(db.Model):
     rating = db.Column(db.Float, default=5.0) 
     is_admin = db.Column(db.Boolean, default=False)
     age = db.Column(db.Integer, nullable=True) 
-    fcm_token = db.Column(db.Text, nullable=True) # NEW: Firebase Device Token
+    fcm_token = db.Column(db.Text, nullable=True)
+    
+    # NEW: Security Questions for Account Recovery
+    security_color = db.Column(db.String(100), nullable=True)
+    security_song = db.Column(db.String(100), nullable=True) 
     
     # Relationships
     items = db.relationship('Item', backref='owner', lazy=True)

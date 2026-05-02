@@ -135,16 +135,21 @@ def hard_delete_user(user_id):
 @admin_bp.route('/api/users', methods=['GET'])
 def get_all_users():
     try:
-        users = User.query.filter((User.is_admin == False) | (User.is_admin == None)).all()
+        # VAVT-91: Removed the filter so EVERYONE shows up on the frontend list
+        users = User.query.all()
         user_list = []
         for user in users:
+            # Check if they are the super admin or a regular admin
+            is_admin_flag = user.email == 'admin@gmail.com' or getattr(user, 'is_admin', False)
+            
             user_list.append({
                 "id": user.id,
                 "full_name": user.full_name,
                 "email": user.email,
                 "department": user.department,
                 "rating": user.rating,
-                "age": getattr(user, 'age', 'N/A')
+                "age": getattr(user, 'age', 'N/A'),
+                "is_admin": is_admin_flag # Send this to Flutter for button protection
             })
         return jsonify(user_list), 200
     except Exception as e:

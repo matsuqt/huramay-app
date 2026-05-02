@@ -64,6 +64,7 @@ const Color accentYellow = Color(0xFFFFD700);
 const Color textDark = Color(0xFF1F2937);
 const Color textLight = Color(0xFF6B7280);
 const Color borderGrey = Color(0xFFE5E7EB);
+const Color bgGray = Color(0xFFF8FAFC); // FIX: Added local bgGray definition
 
 InputDecoration modernInputDecoration(String hint, {Widget? suffixIcon}) {
   return InputDecoration(
@@ -114,9 +115,6 @@ class _LoginScreenState extends State<LoginScreen> {
       if (res.statusCode == 200) {
         currentUser = data;
         
-        // ==========================================
-        // NEW: GRAB THE TOKEN AND SEND TO BACKEND
-        // ==========================================
         try {
           String? fcmToken = await FirebaseMessaging.instance.getToken();
           if (fcmToken != null) {
@@ -128,12 +126,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 'fcm_token': fcmToken
               }),
             );
-            print("Successfully registered device token for push notifications!");
           }
         } catch (e) {
-          print("Warning: Failed to get/send FCM token: $e");
+          debugPrint("FCM token error");
         }
-        // ==========================================
 
         bool isAdmin = data['is_admin'] ?? false;
         showSuccessToast(context, "Welcome back!");
@@ -160,22 +156,12 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Stack(
         children: [
           Positioned(
-            top: -100,
-            right: -50,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withOpacity(0.04)),
-            ),
+            top: -100, right: -50,
+            child: Container(width: 300, height: 300, decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withOpacity(0.04))),
           ),
           Positioned(
-            top: 150,
-            left: -100,
-            child: Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: accentYellow.withOpacity(0.05)),
-            ),
+            top: 150, left: -100,
+            child: Container(width: 200, height: 200, decoration: BoxDecoration(shape: BoxShape.circle, color: accentYellow.withOpacity(0.05))),
           ),
           
           SafeArea(
@@ -186,10 +172,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // --- NEW LOGO IMPLEMENTATION ---
                     Center(
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16), // Gives the logo smooth corners
+                        borderRadius: BorderRadius.circular(16), 
                         child: Image.asset('assets/images/huramay_logo.png', height: 90),
                       ),
                     ),
@@ -204,9 +189,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(24), 
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 24, offset: const Offset(0, 10)),
-                        ],
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 24, offset: const Offset(0, 10))],
                         border: Border.all(color: Colors.grey.shade100, width: 1.5),
                       ),
                       child: Form( 
@@ -243,9 +226,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               child: ElevatedButton(
                                 onPressed: _isLoading ? null : doLogin,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: primaryBlue,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
+                                  backgroundColor: primaryBlue, foregroundColor: Colors.white, elevation: 0,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 ),
                                 child: _isLoading 
@@ -253,6 +234,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                   : const Text("Sign In", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                               ),
                             ),
+                            const SizedBox(height: 16),
+                            
+                            // Universal Forgot Password Access
+                            TextButton(
+                              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const UniversalRecoveryScreen())),
+                              child: const Text("Forgot Password?", style: TextStyle(color: primaryBlue, fontWeight: FontWeight.bold)),
+                            )
                           ],
                         ),
                       ),
@@ -291,8 +279,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _confCtrl = TextEditingController();
-  String? _selectedDept;
   
+  // Security Question Controllers
+  final _colorCtrl = TextEditingController();
+  final _songCtrl = TextEditingController();
+  
+  String? _selectedDept;
   final _formKey = GlobalKey<FormState>();
   bool _obscurePass = true;
   bool _obscureConf = true;
@@ -319,7 +311,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
       var res = await http.post(
         Uri.parse('https://huramay-app.onrender.com/api/register'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'full_name': _nameCtrl.text.trim(), 'email': emailInput, 'department': _selectedDept, 'password': _passCtrl.text}),
+        body: jsonEncode({
+          'full_name': _nameCtrl.text.trim(), 
+          'email': emailInput, 
+          'department': _selectedDept, 
+          'password': _passCtrl.text,
+          'security_color': _colorCtrl.text.trim(),
+          'security_song': _songCtrl.text.trim()
+        }),
       );
       if (!mounted) return;
 
@@ -353,7 +352,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // --- NEW LOGO IMPLEMENTATION ---
               Center(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
@@ -408,7 +406,46 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 onChanged: (v) => setState(() => _selectedDept = v),
                 decoration: modernInputDecoration(""),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 32),
+
+              // --- SECURITY QUESTIONS ---
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: bgGray,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderGrey)
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.security, color: primaryBlue, size: 20),
+                        SizedBox(width: 8),
+                        Text("Account Recovery Setup", style: TextStyle(fontWeight: FontWeight.bold, color: primaryBlue)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Text("What is your favorite color?", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textDark)),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _colorCtrl,
+                      decoration: modernInputDecoration("e.g. Blue"),
+                      validator: (v) => v == null || v.isEmpty ? 'Required for account recovery' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text("What is your favorite song?", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textDark)),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _songCtrl,
+                      decoration: modernInputDecoration("e.g. Bohemian Rhapsody"),
+                      validator: (v) => v == null || v.isEmpty ? 'Required for account recovery' : null,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
 
               const Text("Password", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
               const SizedBox(height: 8),
@@ -489,11 +526,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _pickImage() async {
-    // VAVT-87: Compress the image instantly when the user picks it
     final image = await ImagePicker().pickImage(
       source: ImageSource.gallery,
-      imageQuality: 20, // Compresses the file size by 80%
-      maxWidth: 400,    // Shrinks the dimensions so it isn't 4K
+      imageQuality: 20, 
+      maxWidth: 400,    
       maxHeight: 400,
     );
     
@@ -789,6 +825,152 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
                   : const Text("Save Password", style: TextStyle(fontWeight: FontWeight.w600)),
               ),
             )
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==================== NEW UNIVERSAL RECOVERY SCREEN ====================
+class UniversalRecoveryScreen extends StatefulWidget {
+  const UniversalRecoveryScreen({super.key});
+  @override
+  State<UniversalRecoveryScreen> createState() => _UniversalRecoveryScreenState();
+}
+
+class _UniversalRecoveryScreenState extends State<UniversalRecoveryScreen> {
+  final _emailCtrl = TextEditingController();
+  final _colorCtrl = TextEditingController();
+  final _songCtrl = TextEditingController();
+  final _newPassCtrl = TextEditingController();
+  final _confPassCtrl = TextEditingController();
+  
+  bool _isLoading = false;
+  bool _obscurePass = true;
+
+  Future<void> _submitRecovery() async {
+    if (_emailCtrl.text.isEmpty || _colorCtrl.text.isEmpty || _songCtrl.text.isEmpty || _newPassCtrl.text.isEmpty) {
+      showErrorToast(context, "Please fill in all fields to recover your account.");
+      return;
+    }
+    if (_newPassCtrl.text != _confPassCtrl.text) {
+      showErrorToast(context, "Passwords do not match.");
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      var res = await http.post(
+        Uri.parse('https://huramay-app.onrender.com/api/user/recover_account'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': _emailCtrl.text.trim(),
+          'security_color': _colorCtrl.text.trim(),
+          'security_song': _songCtrl.text.trim(),
+          'new_password': _newPassCtrl.text
+        }),
+      );
+      var data = jsonDecode(res.body);
+      if (res.statusCode == 200) {
+        if (mounted) {
+          showSuccessToast(context, data['message']);
+          Navigator.pop(context); // Send them back to the login screen
+        }
+      } else {
+        if (mounted) showErrorToast(context, data['message']); // E.g., "Security answers incorrect"
+      }
+    } catch (e) {
+      if (mounted) showErrorToast(context, "Connection Error.");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: textDark),
+        title: const Text("Account Recovery", style: TextStyle(color: textDark, fontWeight: FontWeight.bold, fontSize: 18)),
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Icon(Icons.lock_reset, size: 64, color: primaryBlue),
+            const SizedBox(height: 24),
+            const Text("Recover Password", textAlign: TextAlign.center, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: textDark, letterSpacing: -0.5)),
+            const SizedBox(height: 8),
+            const Text("Answer your security questions to set a new password.", textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: textLight)),
+            const SizedBox(height: 40),
+
+            // EMAIL
+            const Text("Email Address", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _emailCtrl,
+              decoration: modernInputDecoration("your.email@gmail.com"),
+            ),
+            const SizedBox(height: 24),
+
+            // SECURITY QUESTIONS
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: bgGray, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderGrey)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Security Verification", style: TextStyle(fontWeight: FontWeight.bold, color: primaryBlue)),
+                  const SizedBox(height: 16),
+                  const Text("What is your favorite color?", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textDark)),
+                  const SizedBox(height: 8),
+                  TextField(controller: _colorCtrl, decoration: modernInputDecoration("Enter your answer")),
+                  const SizedBox(height: 16),
+                  const Text("What is your favorite song?", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textDark)),
+                  const SizedBox(height: 8),
+                  TextField(controller: _songCtrl, decoration: modernInputDecoration("Enter your answer")),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // NEW PASSWORD
+            const Text("New Password", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _newPassCtrl,
+              obscureText: _obscurePass,
+              decoration: modernInputDecoration("••••••••", suffixIcon: IconButton(
+                icon: Icon(_obscurePass ? Icons.visibility_off : Icons.visibility, color: textLight, size: 20),
+                onPressed: () => setState(() => _obscurePass = !_obscurePass),
+              )),
+            ),
+            const SizedBox(height: 16),
+            const Text("Confirm New Password", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _confPassCtrl,
+              obscureText: _obscurePass,
+              decoration: modernInputDecoration("••••••••"),
+            ),
+            const SizedBox(height: 32),
+
+            SizedBox(
+              height: 52,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _submitRecovery,
+                style: ElevatedButton.styleFrom(backgroundColor: primaryBlue, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                child: _isLoading 
+                  ? const CircularProgressIndicator(color: accentYellow)
+                  : const Text("Recover Account", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+            ),
           ],
         ),
       ),

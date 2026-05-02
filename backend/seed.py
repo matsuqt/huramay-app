@@ -4,7 +4,7 @@ import random
 
 fake = Faker()
 
-# The URL to your LIVE Render API
+# The URL to your LOCAL running backend
 API_URL = 'http://127.0.0.1:5000/api/register'
 
 # Standard departments from your app
@@ -15,10 +15,27 @@ DEPARTMENTS = [
     'Faculty / Staff'
 ]
 
-def generate_fake_users(amount=200):
+def generate_fake_users(amount=50): # I lowered this to 50 so it seeds much faster for local testing!
     print(f"Starting to generate {amount} users...")
     success_count = 0
     
+    # 1. CREATE THE DEFAULT SUPER ADMIN FIRST
+    admin_data = {
+        'full_name': 'System Administrator',
+        'email': 'admin@gmail.com',
+        'department': 'Faculty / Staff',
+        'password': 'Password123!',
+        'security_color': 'blue',
+        'security_song': 'bohemian rhapsody'
+    }
+    try:
+        res = requests.post(API_URL, json=admin_data)
+        if res.status_code == 201:
+            print("Successfully created Super Admin (admin@gmail.com)")
+    except Exception as e:
+        print("Failed to create Super Admin. Server might not be running.")
+    
+    # 2. SEED THE RANDOM USERS
     for i in range(amount):
         # Generate realistic fake data
         fake_name = fake.name()
@@ -33,9 +50,11 @@ def generate_fake_users(amount=200):
             'email': fake_email,
             'department': random.choice(DEPARTMENTS),
             'password': 'Password123!', # Standard password for all test accounts
+            'security_color': 'blue',            # DEFAULT RECOVERY COLOR
+            'security_song': 'bohemian rhapsody' # DEFAULT RECOVERY SONG
         }
         
-        # Send the data to your live server
+        # Send the data to your local server
         try:
             response = requests.post(API_URL, json=user_data)
             if response.status_code == 201:
@@ -46,7 +65,7 @@ def generate_fake_users(amount=200):
         except Exception as e:
             print(f"Connection Error: {e}")
 
-    print(f"\nDone! Successfully seeded {success_count} users to the cloud.")
+    print(f"\nDone! Successfully seeded {success_count} users to the database.")
 
 if __name__ == '__main__':
-    generate_fake_users(200)
+    generate_fake_users(50)
