@@ -326,6 +326,30 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
   }
 
+  // ==========================================
+  // NEW: VAVT-94 STATIC POLICY BANNER
+  // ==========================================
+  Widget _buildPolicyBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      color: Colors.blueGrey.shade50,
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, color: primaryBlue, size: 20),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              "Notice: If the item is not returned 3 days after the agreed date, the owner has the right to charge a late fee of 5% of the item's price per day.",
+              style: TextStyle(color: textDark, fontSize: 11, fontWeight: FontWeight.w600, height: 1.3),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -362,6 +386,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
           Column(
             children: [
+              // Inject the Banner right at the top of the chat area
+              _buildPolicyBanner(),
+
               Expanded(
                 child: isLoading
                     ? const Center(child: CircularProgressIndicator(color: primaryBlue))

@@ -767,22 +767,32 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
                                         ],
                                       ),
                                     ),
-                                    // DOUBLE ACTION BUTTONS
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          icon: const Icon(Icons.block, color: Colors.orange, size: 24),
-                                          tooltip: "Ban User",
-                                          onPressed: () => _showBanConfirmation(user),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.delete_forever, color: Colors.red, size: 24),
-                                          tooltip: "Hard Delete",
-                                          onPressed: () => _showHardDeleteConfirmation(user),
-                                        ),
-                                      ],
-                                    ),
+                                    // DOUBLE ACTION BUTTONS (VAVT-91 Armor)
+                                    user['is_admin'] == true
+                                        ? Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            decoration: BoxDecoration(
+                                              color: Colors.blueGrey.shade50, 
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(color: Colors.blueGrey.shade200)
+                                            ),
+                                            child: const Text("Protected Admin", style: TextStyle(color: Colors.blueGrey, fontSize: 10, fontWeight: FontWeight.bold)),
+                                          )
+                                        : Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(Icons.block, color: Colors.orange, size: 24),
+                                                tooltip: "Ban User",
+                                                onPressed: () => _showBanConfirmation(user),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(Icons.delete_forever, color: Colors.red, size: 24),
+                                                tooltip: "Hard Delete",
+                                                onPressed: () => _showHardDeleteConfirmation(user),
+                                              ),
+                                            ],
+                                          ),
                                   ],
                                 ),
                               );
@@ -1056,25 +1066,27 @@ class AdminProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 48),
             
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (c) => const AdminManagementScreen()));
-                },
-                icon: const Icon(Icons.manage_accounts_outlined, size: 20),
-                label: const Text("Manage Administrators", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: textDark,
-                  side: const BorderSide(color: borderGrey, width: 1),
-                  backgroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            // VAVT-91: Only the Super Admin can see the "Manage Administrators" route
+            if (currentUser?['email'] == 'admin@gmail.com') ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (c) => const AdminManagementScreen()));
+                  },
+                  icon: const Icon(Icons.manage_accounts_outlined, size: 20),
+                  label: const Text("Manage Administrators", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: textDark,
+                    side: const BorderSide(color: borderGrey, width: 1),
+                    backgroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
               ),
-            ),
-            
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
+            ],
 
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 40),

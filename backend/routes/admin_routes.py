@@ -65,30 +65,29 @@ def delete_admin(admin_id):
     db.session.commit()
     return jsonify({"message": "Admin deleted successfully"}), 200
 
-@admin_bp.route('/api/users/<int:user_id>', methods=['DELETE'])
-def ban_user(user_id):
+# ==================== NEW: SOFT DELETE (DISABLE) ====================
+@admin_bp.route('/api/users/<int:user_id>/toggle_disable', methods=['PUT'])
+def toggle_disable_user(user_id):
     user = User.query.get(user_id)
     if not user:
         return jsonify({"message": "User not found"}), 404
     
     if user.email == 'admin@gmail.com' or getattr(user, 'is_admin', False):
-        return jsonify({"message": "Access Denied"}), 403
+        return jsonify({"message": "Access Denied: Cannot disable an Administrator."}), 403
         
     try:
-        # Added Deep Clean here to prevent crashes if the ban button is used
-        Favorite.query.filter_by(user_id=user_id).delete()          
-        ReportItem.query.filter_by(reporter_id=user_id).delete()    
-        BorrowRequest.query.filter_by(borrower_id=user_id).delete() 
-        Item.query.filter_by(user_id=user_id).delete()
-        db.session.delete(user)
+        current_status = getattr(user, 'is_disabled', False)
+        user.is_disabled = not current_status
         db.session.commit()
-        return jsonify({"message": "User and their items have been banned/deleted"}), 200
+        
+        action_msg = "enabled and can log in." if current_status else "disabled and locked out."
+        return jsonify({"message": f"User account has been {action_msg}"}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({"message": "Error banning user", "error": str(e)}), 500
+        return jsonify({"message": "Error updating user status", "error": str(e)}), 500
 
 
-# --- THE UPGRADED TWO-WAY ARMOR ---
+# ==================== HARD DELETE (Keep as is) ====================
 @admin_bp.route('/api/users/<int:user_id>/hard_delete', methods=['DELETE'])
 def hard_delete_user(user_id):
     user = User.query.get(user_id)
@@ -99,7 +98,6 @@ def hard_delete_user(user_id):
         return jsonify({"message": "Access Denied"}), 403
         
     try:
-        # ARMOR CHECK 1: The Lender (Case-Insensitive)
         active_lending = Item.query.filter(
             Item.user_id == user_id,
             db.func.lower(Item.status) == 'borrowed'
@@ -108,7 +106,6 @@ def hard_delete_user(user_id):
         if active_lending:
             return jsonify({"message": "Cannot delete: User owns an item that is currently borrowed out."}), 400
             
-        # ARMOR CHECK 2: The Borrower (Case-Insensitive + Expanded Status List)
         active_borrowing = BorrowRequest.query.filter(
             BorrowRequest.borrower_id == user_id,
             db.func.lower(BorrowRequest.status).in_([
@@ -119,12 +116,11 @@ def hard_delete_user(user_id):
         if active_borrowing:
             return jsonify({"message": f"Cannot delete: User is actively borrowing (Status: {active_borrowing.status})."}), 400
             
-        # SAFE ZONE: Execute Deep Cascading Cleanup
-        Favorite.query.filter_by(user_id=user_id).delete()          # Wipe favorites
-        ReportItem.query.filter_by(reporter_id=user_id).delete()    # Wipe submitted reports
-        BorrowRequest.query.filter_by(borrower_id=user_id).delete() # Wipe request history
-        Item.query.filter_by(user_id=user_id).delete()              # Wipe uploaded items
-        db.session.delete(user)                                     # Wipe the user
+        Favorite.query.filter_by(user_id=user_id).delete()          
+        ReportItem.query.filter_by(reporter_id=user_id).delete()    
+        BorrowRequest.query.filter_by(borrower_id=user_id).delete() 
+        Item.query.filter_by(user_id=user_id).delete()              
+        db.session.delete(user)                                     
         db.session.commit()
         
         return jsonify({"message": "User permanently wiped from system."}), 200
@@ -135,17 +131,36 @@ def hard_delete_user(user_id):
 @admin_bp.route('/api/users', methods=['GET'])
 def get_all_users():
     try:
-        users = User.query.filter((User.is_admin == False) | (User.is_admin == None)).all()
+        users = User.query.all()
         user_list = []
         for user in users:
+            is_admin_flag = user.email == 'admin@gmail.com' or getattr(user, 'is_admin', False)
+            
             user_list.append({
                 "id": user.id,
                 "full_name": user.full_name,
                 "email": user.email,
                 "department": user.department,
                 "rating": user.rating,
-                "age": getattr(user, 'age', 'N/A')
+                "age": getattr(user, 'age', 'N/A'),
+                "is_admin": is_admin_flag,
+                "is_disabled": getattr(user, 'is_disabled', False) # NEW: Send status to frontend
             })
         return jsonify(user_list), 200
     except Exception as e:
         return jsonify({"message": f"Server Error: {str(e)}"}), 500
+    
+
+# ==================== SECRET MAINTENANCE ROUTE ====================
+@admin_bp.route('/api/maintenance/rebuild-db-secret-key-123', methods=['GET'])
+def rebuild_database_live():
+    try:
+        # This executes the wipe and rebuild without needing a terminal!
+        db.drop_all() 
+        db.create_all()
+        return jsonify({
+            "status": "success",
+            "message": "LIVE DATABASE WIPED AND REBUILT SUCCESSFULLY WITH NEW COLUMNS!"
+        }), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500

@@ -1,7 +1,12 @@
 import pytest
 import json
-# Import your app and database from your main app.py file
-from app import app, db, User, Item, BorrowRequest
+from app import app
+from database import db, bcrypt 
+# Point directly to the model files in your models folder
+from models.user import User
+from models.item import Item
+from models.borrow_request import BorrowRequest
+from models.report_item import ReportItem
 
 # ==========================================
 # 1. SETUP: The "Test Client" Fixture
