@@ -1,20 +1,21 @@
-name: Huramay CI/CD Pipeline
+name: Huramay Essential Testing
 
 on:
   push:
-    branches: [ "main" ] # Runs every time you push to the main branch
+    branches:
+      - main
 
 jobs:
   # ==========================================
-  # JOB 1: TEST & DEPLOY BACKEND (PYTHON)
+  # JOB 1: TEST BACKEND ONLY
   # ==========================================
-  backend:
-    name: Test and Deploy Backend
+  test-backend:
+    name: Python Backend Tests
     runs-on: ubuntu-latest
-    # Tells GitHub your Python code is inside the backend folder
+    
     defaults:
       run:
-        working-directory: ./backend 
+        working-directory: ./backend
 
     steps:
       - name: Checkout Code
@@ -23,37 +24,26 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13" # Matching the version from your terminal
+          python-version: "3.13" 
 
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Tests
+      - name: Run Backend Tests
         run: python -m pytest tests/ -v
 
-      # This is the "CD" part! It only runs if the tests pass.
-      - name: Deploy to Render
-        if: success() 
-        run: curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
-
   # ==========================================
-  # JOB 2: BUILD FRONTEND (FLUTTER)
+  # JOB 2: TEST FRONTEND ONLY
   # ==========================================
-  frontend:
-    name: Build Android APK
+  test-frontend:
+    name: Flutter Frontend Tests
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -63,11 +53,8 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Build APK
-        run: flutter build apk --release
+      - name: Check for Syntax Errors
+        run: flutter analyze
 
-      - name: Save APK to GitHub
-        uses: actions/upload-artifact@v4
-        with:
-          name: huramay-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+      - name: Run Flutter Tests
+        run: flutter test
