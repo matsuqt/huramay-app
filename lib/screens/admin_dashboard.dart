@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:io';
 
 import '../globals.dart';
 import 'auth_screens.dart'; 
@@ -475,7 +474,6 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
     _applySorting(); 
   }
 
-  // --- NEW: TOGGLE DISABLE LOGIC ---
   Future<void> _executeToggleDisable(dynamic user) async {
     int userId = user['id'];
     try {
@@ -533,7 +531,6 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
     );
   }
 
-  // --- HARD DELETE LOGIC (VAVT-88) ---
   Future<void> _executeHardDelete(int userId) async {
     try {
       final res = await http.delete(Uri.parse('https://huramay-app.onrender.com/api/users/$userId/hard_delete'));
@@ -716,7 +713,6 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
                                   ? user['full_name'].toString().substring(0, 1).toUpperCase() 
                                   : "?";
                                   
-                              // Grab the status from the backend
                               bool isDisabled = user['is_disabled'] ?? false;
 
                               return Container(
@@ -760,10 +756,6 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
                                         ],
                                       ),
                                     ),
-<<<<<<< HEAD
-                                    // DOUBLE ACTION BUTTONS (VAVT-91 Armor)
-=======
->>>>>>> d2fde7bcb7b2ce08749157825de7d95a3a13f849
                                     user['is_admin'] == true
                                         ? Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -772,30 +764,16 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
                                               borderRadius: BorderRadius.circular(12),
                                               border: Border.all(color: Colors.blueGrey.shade200)
                                             ),
-<<<<<<< HEAD
-                                            child: const Text("Protected Admin", style: TextStyle(color: Colors.blueGrey, fontSize: 10, fontWeight: FontWeight.bold)),
-=======
                                             child: const Text("Protected", style: TextStyle(color: Colors.blueGrey, fontSize: 10, fontWeight: FontWeight.bold)),
->>>>>>> d2fde7bcb7b2ce08749157825de7d95a3a13f849
                                           )
                                         : Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-<<<<<<< HEAD
-                                              IconButton(
-                                                icon: const Icon(Icons.block, color: Colors.orange, size: 24),
-                                                tooltip: "Ban User",
-                                                onPressed: () => _showBanConfirmation(user),
-                                              ),
-=======
-                                              // NEW TOGGLE BUTTON
                                               IconButton(
                                                 icon: Icon(isDisabled ? Icons.check_circle_outline : Icons.block, color: isDisabled ? Colors.green : Colors.orange, size: 24),
                                                 tooltip: isDisabled ? "Enable User" : "Disable User",
                                                 onPressed: () => _showDisableConfirmation(user, isDisabled),
                                               ),
-                                              // HARD DELETE REMAINS
->>>>>>> d2fde7bcb7b2ce08749157825de7d95a3a13f849
                                               IconButton(
                                                 icon: const Icon(Icons.delete_forever, color: Colors.red, size: 24),
                                                 tooltip: "Hard Delete",
@@ -1074,10 +1052,6 @@ class AdminProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 48),
             
-<<<<<<< HEAD
-            // VAVT-91: Only the Super Admin can see the "Manage Administrators" route
-=======
->>>>>>> d2fde7bcb7b2ce08749157825de7d95a3a13f849
             if (currentUser?['email'] == 'admin@gmail.com') ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -1134,7 +1108,6 @@ class AdminManagementScreen extends StatefulWidget {
 class _AdminManagementScreenState extends State<AdminManagementScreen> {
   List<dynamic> adminList = [];
   bool isLoading = true;
-
   final String superAdminEmail = "admin@gmail.com"; 
 
   @override
