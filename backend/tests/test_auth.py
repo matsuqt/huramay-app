@@ -33,7 +33,6 @@ def test_register_success(client):
         "password": "securepassword123"
     })
     assert response.status_code == 201
-    print(response.json)
     assert json.loads(response.data)['message'] == "Registration successful!"
 
 def test_register_invalid_name(client):
