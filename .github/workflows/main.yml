@@ -10,7 +10,7 @@ jobs:
   # JOB 1: TEST BACKEND ONLY
   # ==========================================
   test-backend:
-    name: Python Backend Tests
+    name: Backend Tests
     runs-on: ubuntu-latest
     
     defaults:
@@ -38,7 +38,7 @@ jobs:
   # JOB 2: TEST FRONTEND ONLY
   # ==========================================
   test-frontend:
-    name: Flutter Frontend Tests
+    name: Frontend Tests
     runs-on: ubuntu-latest
     # Notice: No working-directory needed here!
 
