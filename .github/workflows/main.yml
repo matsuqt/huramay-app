@@ -40,6 +40,7 @@ jobs:
   test-frontend:
     name: Flutter Frontend Tests
     runs-on: ubuntu-latest
+    # Notice: No working-directory needed here!
 
     steps:
       - name: Checkout Code
