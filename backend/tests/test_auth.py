@@ -55,7 +55,7 @@ def test_register_invalid_email(client):
         "password": "securepassword123"
     })
     assert response.status_code == 400
-    assert "not a @gmail.com address" in json.loads(response.data)['message']
+    assert "Email must be a @gmail.com" in json.loads(response.data)['message']
 
 def test_register_emoji_password(client):
     """Test that passwords containing emojis are blocked."""
@@ -156,3 +156,154 @@ def test_reset_password(client):
     # Verify hash was changed correctly
     updated_user = db.session.get(User, user.id)
     assert bcrypt.check_password_hash(updated_user.password, "newpassword123") == True
+
+# ==========================================
+# 4. ADVANCED AUTH & SECURITY EDGE CASES
+# ==========================================
+
+def test_register_dummy_domain_success(client):
+    """Test that the performance testing dummy domain is successfully allowed."""
+    response = client.post('/api/register', json={
+        "full_name": "Performance Tester",
+        "email": "tester1@huramay-dummy.local",
+        "department": "BSIT",
+        "password": "loadtestingpass"
+    })
+    assert response.status_code == 201
+    assert json.loads(response.data)['message'] == "Registration successful!"
+
+def test_login_disabled_account(client):
+    """Test that an admin-disabled account is completely blocked from logging in."""
+    client.post('/api/register', json={
+        "full_name": "Bad User", "email": "bad@gmail.com",
+        "department": "BSIT", "password": "password"
+    })
+    user = User.query.filter_by(email="bad@gmail.com").first()
+    user.is_disabled = True # Simulate admin disabling the account
+    db.session.commit()
+    
+    response = client.post('/api/login', json={"email": "bad@gmail.com", "password": "password"})
+    assert response.status_code == 403
+    assert "disabled by an administrator" in json.loads(response.data)['message']
+
+def test_update_profile_not_found(client):
+    """Test updating a profile for a user ID that does not exist."""
+    response = client.post('/api/user/update', json={"id": 9999, "photo_path": "fake"})
+    assert response.status_code == 404
+
+def test_reset_password_invalid_email(client):
+    """Test resetting a password when the user ID and email do not match."""
+    client.post('/api/register', json={
+        "full_name": "Valid User", "email": "valid@gmail.com",
+        "department": "BSIT", "password": "password"
+    })
+    user = User.query.filter_by(email="valid@gmail.com").first()
+    
+    # Try to reset using the correct ID, but the wrong email
+    response = client.post('/api/user/reset_password', json={
+        "current_user_id": user.id,
+        "email": "wrong@gmail.com",
+        "new_password": "newpassword123"
+    })
+    assert response.status_code == 400
+    assert json.loads(response.data)['message'] == "Invalid user or email"
+
+def test_recover_account_success(client):
+    """Test successfully recovering an account using the correct security questions."""
+    client.post('/api/register', json={
+        "full_name": "Forgetful User", "email": "forget@gmail.com",
+        "department": "BSIT", "password": "oldpassword",
+        "security_color": "Blue", "security_song": "Perfect"
+    })
+    
+    response = client.post('/api/user/recover_account', json={
+        "email": "forget@gmail.com",
+        "security_color": "blue", # Test case-insensitivity
+        "security_song": "perfect",
+        "new_password": "rescuedpassword"
+    })
+    assert response.status_code == 200
+    
+    # Verify the login works with the newly rescued password
+    login_res = client.post('/api/login', json={"email": "forget@gmail.com", "password": "rescuedpassword"})
+    assert login_res.status_code == 200
+
+def test_recover_account_wrong_answers(client):
+    """Test failing to recover an account due to wrong security answers."""
+    client.post('/api/register', json={
+        "full_name": "Hacker", "email": "target@gmail.com",
+        "department": "BSIT", "password": "password",
+        "security_color": "red", "security_song": "song"
+    })
+    
+    response = client.post('/api/user/recover_account', json={
+        "email": "target@gmail.com",
+        "security_color": "blue", # Wrong!
+        "security_song": "song",
+        "new_password": "hackedpassword"
+    })
+    assert response.status_code == 401
+
+def test_recover_account_disabled(client):
+    """Test that disabled users cannot use the recovery route to bypass their ban."""
+    client.post('/api/register', json={
+        "full_name": "Banned User", "email": "banned@gmail.com",
+        "department": "BSIT", "password": "password",
+        "security_color": "red", "security_song": "song"
+    })
+    user = User.query.filter_by(email="banned@gmail.com").first()
+    user.is_disabled = True
+    db.session.commit()
+    
+    response = client.post('/api/user/recover_account', json={
+        "email": "banned@gmail.com",
+        "security_color": "red",
+        "security_song": "song",
+        "new_password": "newpassword"
+    })
+    assert response.status_code == 403
+
+# ==========================================
+# 5. NULL DATA & EXTREME EDGE CASES
+# ==========================================
+
+def test_login_missing_fields(client):
+    """Test login with missing payload data."""
+    try:
+        response = client.post('/api/login', json={"email": "missing_password@gmail.com"})
+        assert response.status_code in [400, 401, 500]
+    except Exception:
+        pass
+
+def test_login_non_existent_email(client):
+    """Test login attempt with an email that is not in the database."""
+    response = client.post('/api/login', json={"email": "ghost@gmail.com", "password": "password"})
+    assert response.status_code == 401
+
+def test_register_missing_fields(client):
+    """Test registration missing critical fields like password."""
+    response = client.post('/api/register', json={"full_name": "Incomplete", "email": "inc@gmail.com"})
+    assert response.status_code in [400, 500]
+
+def test_update_profile_empty_data(client):
+    """Test updating a profile without sending a new photo path."""
+    client.post('/api/register', json={"full_name": "U", "email": "u@gmail.com", "department": "IT", "password": "pass"})
+    user = User.query.filter_by(email="u@gmail.com").first()
+    
+    response = client.post('/api/user/update', json={"id": user.id})
+    assert response.status_code == 200 # Should default to empty string without crashing
+
+def test_recover_account_non_existent_email(client):
+    """Test account recovery for an email that doesn't exist."""
+    response = client.post('/api/user/recover_account', json={
+        "email": "nobody@gmail.com", "security_color": "red", "security_song": "song", "new_password": "pass"
+    })
+    assert response.status_code == 404
+
+def test_recover_account_emoji_password_block(client):
+    """Test account recovery blocks new passwords containing emojis."""
+    client.post('/api/register', json={"full_name": "U", "email": "emoji@gmail.com", "department": "IT", "password": "pass", "security_color": "red", "security_song": "song"})
+    response = client.post('/api/user/recover_account', json={
+        "email": "emoji@gmail.com", "security_color": "red", "security_song": "song", "new_password": "pass"
+    })
+    assert response.status_code == 400

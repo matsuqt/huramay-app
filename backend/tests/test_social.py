@@ -71,3 +71,107 @@ def test_submit_review(client):
     })
     
     assert response.status_code == 201
+
+# ==========================================
+# REVIEW LOGIC & EDGE CASES
+# ==========================================
+
+def test_submit_review_lender_not_found(client):
+    """Test attempting to review a lender ID that doesn't exist."""
+    response = client.post('/api/review', json={
+        "reviewer_id": 1,
+        "lender_id": 9999, # Does not exist
+        "item_id": 1,
+        "rating": 5,
+        "review_text": "Good"
+    })
+    assert response.status_code == 404
+    assert json.loads(response.data)['message'] == "Lender not found"
+
+def test_review_rating_average_calculation(client):
+    """Test that the first review overrides the 5.0 default, and the second review averages correctly."""
+    reviewer = User(full_name="Reviewer", email="reviewer@gmail.com", department="IT", password="hash")
+    lender = User(full_name="Lender", email="lender@gmail.com", department="IT", password="hash")
+    db.session.add_all([reviewer, lender])
+    db.session.commit()
+    
+    # Lender starts at default 5.0
+    assert lender.rating == 5.0
+    
+    # 1st Review: Gives a 3.0. Because lender is at default 5.0, it should completely overwrite it to 3.0
+    client.post('/api/review', json={
+        "reviewer_id": reviewer.id, "lender_id": lender.id, "item_id": 1, "rating": 3, "review_text": "Okay"
+    })
+    assert db.session.get(User, lender.id).rating == 3.0
+    
+    # 2nd Review: Gives a 5.0. It should now average the existing 3.0 and new 5.0 to make 4.0
+    client.post('/api/review', json={
+        "reviewer_id": reviewer.id, "lender_id": lender.id, "item_id": 1, "rating": 5, "review_text": "Better"
+    })
+    assert db.session.get(User, lender.id).rating == 4.0
+
+def test_get_item_reviews_success(client):
+    """Test fetching reviews for an item and verifying the nested user data format."""
+    reviewer = User(full_name="Alice", email="alice@gmail.com", department="IT", password="hash")
+    lender = User(full_name="Bob", email="bob@gmail.com", department="IT", password="hash")
+    item = Item(title="Pen", description="Blue", owner_name="Bob", department="IT", user_id=2)
+    db.session.add_all([reviewer, lender, item])
+    db.session.commit()
+    
+    client.post('/api/review', json={
+        "reviewer_id": reviewer.id, "lender_id": lender.id, "item_id": item.id, "rating": 5, "review_text": "Great pen!"
+    })
+    
+    response = client.get(f'/api/reviews/item/{item.id}')
+    data = json.loads(response.data)
+    
+    assert response.status_code == 200
+    assert len(data) == 1
+    assert data[0]['reviewer_name'] == "Alice" # Verifies the relationship mapping worked
+    assert data[0]['comment'] == "Great pen!"
+
+def test_get_item_reviews_empty(client):
+    """Test fetching reviews for an item that has not been reviewed yet."""
+    response = client.get('/api/reviews/item/999')
+    assert response.status_code == 200
+    assert json.loads(response.data) == [] # Should not crash, just return empty list
+
+# ==========================================
+# ADVANCED FAVORITE TESTS
+# ==========================================
+
+def test_get_favorites_empty(client):
+    """Test fetching favorites for a user who has none."""
+    response = client.get('/api/favorites/999')
+    assert response.status_code == 200
+    assert len(json.loads(response.data)) == 0
+
+def test_check_favorite_true(client):
+    """Test the boolean check endpoint returns True when an item is favorited."""
+    user = User(full_name="User", email="u@gmail.com", department="IT", password="hash")
+    item = Item(title="Item", description="Desc", owner_name="Admin", department="IT", user_id=1)
+    db.session.add_all([user, item])
+    db.session.commit()
+    
+    client.post('/api/favorites/toggle', json={"user_id": user.id, "item_id": item.id})
+    
+    response = client.post('/api/favorites/check', json={"user_id": user.id, "item_id": item.id})
+    assert json.loads(response.data)['is_favorite'] is True
+
+def test_check_favorite_false(client):
+    """Test the boolean check endpoint returns False when an item is not favorited."""
+    response = client.post('/api/favorites/check', json={"user_id": 999, "item_id": 999})
+    assert json.loads(response.data)['is_favorite'] is False
+
+def test_get_favorites_populated(client):
+    """Test fetching actual item data through the favorites relationship."""
+    user = User(full_name="User", email="u@gmail.com", department="IT", password="hash")
+    item = Item(title="Fav Data", description="Desc", owner_name="Admin", department="IT", user_id=1)
+    db.session.add_all([user, item])
+    db.session.commit()
+    client.post('/api/favorites/toggle', json={"user_id": user.id, "item_id": item.id})
+    
+    response = client.get(f'/api/favorites/{user.id}')
+    data = json.loads(response.data)
+    assert len(data) == 1
+    assert data[0]['title'] == "Fav Data"

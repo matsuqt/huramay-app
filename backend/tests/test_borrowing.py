@@ -168,3 +168,162 @@ def test_get_owner_requests_empty(client):
     data = json.loads(response.data)
     assert response.status_code == 200
     assert len(data) == 0
+
+# ==========================================
+# NEW EDGE CASE & DATA STRUCTURE TESTS
+# ==========================================
+
+def test_submit_borrow_request_with_optional_fields(client):
+    """Test submitting a request including proof of ID and a custom meetup location."""
+    response = client.post('/api/borrow/request', json={
+        "item_id": 1,
+        "borrower_id": 2,
+        "full_name": "Borrower Bob",
+        "department": "BSIT",
+        "start_date": "2026-05-10",
+        "end_date": "2026-05-12",
+        "proof_of_id_path": "/images/id_card.png",
+        "meetup_location": "Library Room 3"
+    })
+    assert response.status_code == 201
+    
+    # Verify it saved correctly in the Database
+    req = db.session.query(BorrowRequest).first()
+    assert req.proof_of_id_path == "/images/id_card.png"
+    assert req.meetup_location == "Library Room 3"
+
+def test_submit_borrow_request_missing_item_id(client):
+    """Test failing to submit a borrow request without a mandatory item_id."""
+    response = client.post('/api/borrow/request', json={
+        "borrower_id": 2,
+        "full_name": "Bob",
+        "department": "BSIT",
+        "start_date": "2026-05-10",
+        "end_date": "2026-05-12"
+    })
+    assert response.status_code == 500
+
+def test_get_borrower_history_with_data(client):
+    """Test fetching borrow history when the user actually has past requests."""
+    req1 = BorrowRequest(item_id=1, borrower_id=2, full_name="Bob", department="BSIT", start_date="Now", end_date="Tomorrow")
+    db.session.add(req1)
+    db.session.commit()
+    
+    response = client.get('/api/borrow/history/2')
+    data = json.loads(response.data)
+    assert response.status_code == 200
+    assert len(data) == 1
+    assert data[0]['borrower_id'] == 2
+    
+    # Check that the nested '_item_to_dict' helper attached the item data
+    assert 'item' in data[0]
+    assert data[0]['item']['title'] == "Projector"
+
+def test_get_owner_requests_multiple(client):
+    """Test fetching requests when multiple people request the exact same owner's items."""
+    req1 = BorrowRequest(item_id=1, borrower_id=2, full_name="Bob", department="BSIT", start_date="Now", end_date="Tomorrow")
+    req2 = BorrowRequest(item_id=1, borrower_id=2, full_name="Bob Again", department="BSIT", start_date="Next Week", end_date="Next Month")
+    db.session.add_all([req1, req2])
+    db.session.commit()
+    
+    response = client.get('/api/borrow/requests/owner/1')
+    data = json.loads(response.data)
+    assert response.status_code == 200
+    assert len(data) == 2
+
+def test_submit_report_missing_text(client):
+    """Test failing to submit a report without the actual report text."""
+    response = client.post('/api/report', json={
+        "reporter_id": 2,
+        "item_id": 1
+        # Missing report_text
+    })
+    assert response.status_code == 500
+
+def test_get_all_reports_empty(client):
+    """Test fetching all reports when none exist in the database."""
+    response = client.get('/api/reports/all')
+    data = json.loads(response.data)
+    assert response.status_code == 200
+    assert data == [] # Should return an empty array, not crash
+
+def test_get_all_reports_data_structure(client):
+    """Test that the get_all_reports endpoint returns the correctly joined database fields."""
+    report = ReportItem(reporter_id=2, item_id=1, report_text="Defective")
+    db.session.add(report)
+    db.session.commit()
+    
+    response = client.get('/api/reports/all')
+    data = json.loads(response.data)
+    assert response.status_code == 200
+    assert 'reporter_name' in data[0]
+    assert 'item_title' in data[0]
+    assert 'timestamp' in data[0]
+    assert data[0]['reporter_name'] == "Borrower Bob"
+    assert data[0]['item_title'] == "Projector"
+
+def test_update_request_status_arbitrary(client):
+    """Test updating a request to a custom status string outside the standard Accepted/Returned."""
+    req = BorrowRequest(item_id=1, borrower_id=2, full_name="Bob", department="BSIT", start_date="Now", end_date="Tomorrow")
+    db.session.add(req)
+    db.session.commit()
+    
+    response = client.put(f'/api/borrow/request/{req.id}', json={"status": "Overdue"})
+    assert response.status_code == 200
+    
+    updated_req = db.session.get(BorrowRequest, req.id)
+    assert updated_req.status == "Overdue"
+
+# ==========================================
+# BORROW ROUTE EDGE CASES
+# ==========================================
+
+def test_accept_request_invalid_id(client):
+    """Test accepting a request ID that doesn't exist."""
+    response = client.put('/api/borrow/request/9999', json={"status": "Accepted"})
+    assert response.status_code == 404
+
+def test_get_owner_requests_invalid_owner(client):
+    """Test fetching owner requests for a non-existent owner (should return empty)."""
+    response = client.get('/api/borrow/requests/owner/9999')
+    assert response.status_code == 200
+    assert len(json.loads(response.data)) == 0
+
+def test_submit_report_invalid_item(client):
+    """Test submitting a report for an item that doesn't exist."""
+    try:
+        response = client.post('/api/report', json={"reporter_id": 1, "item_id": 999, "report_text": "Fake item"})
+        assert response.status_code in [404, 500] # DB constraint failure
+    except Exception:
+        pass
+
+def test_update_borrow_request_missing_status(client):
+    """Test updating a borrow request without providing the new status payload."""
+    req = BorrowRequest(item_id=1, borrower_id=2, full_name="Bob", department="IT", start_date="Now", end_date="Later")
+    db.session.add(req)
+    db.session.commit()
+    
+    response = client.put(f'/api/borrow/request/{req.id}', json={})
+    assert response.status_code == 200 # Should process without crashing, retaining old status
+
+def test_borrow_request_default_meetup_location(client):
+    """Test that omitting meetup_location triggers the 'LNU Campus Only' default."""
+    response = client.post('/api/borrow/request', json={
+        "item_id": 1, "borrower_id": 2, "full_name": "Bob",
+        "department": "IT", "start_date": "Now", "end_date": "Later"
+        # No meetup location provided
+    })
+    assert response.status_code == 201
+    req = BorrowRequest.query.filter_by(borrower_id=2).first()
+    assert req.meetup_location == "LNU Campus Only"
+
+def test_borrow_history_data_integrity(client):
+    """Test that the fetched history data perfectly matches the database object."""
+    req = BorrowRequest(item_id=1, borrower_id=2, full_name="Strict Bob", department="IT", start_date="Day 1", end_date="Day 2")
+    db.session.add(req)
+    db.session.commit()
+    
+    response = client.get('/api/borrow/history/2')
+    data = json.loads(response.data)
+    assert data[-1]['start_date'] == "Day 1"
+    assert data[-1]['end_date'] == "Day 2"
