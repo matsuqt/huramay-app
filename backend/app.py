@@ -28,7 +28,7 @@ bcrypt.init_app(app)
 # Register all routes (Blueprints)
 app.register_blueprint(auth_bp)
 app.register_blueprint(item_bp)
-app.register_blueprint(borrow_bp)
+app.register_blueprint(borrow_bp) 
 app.register_blueprint(chat_bp)
 app.register_blueprint(favorite_bp)
 app.register_blueprint(review_bp)
@@ -39,4 +39,4 @@ with app.app_context():
     db.create_all()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)   

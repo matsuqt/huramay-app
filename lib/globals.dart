@@ -1,5 +1,5 @@
+// lib/globals.dart
 Map<String, dynamic>? currentUser;
 
-// NEW: Add your computer's actual IPv4 address here!
-// const String baseUrl = 'https://huramay-app.onrender.com/api';
+// Set to your LIVE server so the APK works on your physical phone
 const String baseUrl = 'https://huramay-app.onrender.com';

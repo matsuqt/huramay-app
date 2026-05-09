@@ -65,7 +65,7 @@ def delete_admin(admin_id):
     db.session.commit()
     return jsonify({"message": "Admin deleted successfully"}), 200
 
-# ==================== NEW: SOFT DELETE (DISABLE) ====================
+# ==================== SOFT DELETE (DISABLE) ====================
 @admin_bp.route('/api/users/<int:user_id>/toggle_disable', methods=['PUT'])
 def toggle_disable_user(user_id):
     user = User.query.get(user_id)
@@ -87,7 +87,7 @@ def toggle_disable_user(user_id):
         return jsonify({"message": "Error updating user status", "error": str(e)}), 500
 
 
-# ==================== HARD DELETE (Keep as is) ====================
+# ==================== HARD DELETE ====================
 @admin_bp.route('/api/users/<int:user_id>/hard_delete', methods=['DELETE'])
 def hard_delete_user(user_id):
     user = User.query.get(user_id)
@@ -128,12 +128,17 @@ def hard_delete_user(user_id):
         db.session.rollback()
         return jsonify({"message": "Error deleting user", "error": str(e)}), 500
 
+# ==================== UPDATED: PAGINATED GET USERS ====================
 @admin_bp.route('/api/users', methods=['GET'])
 def get_all_users():
     try:
-        users = User.query.all()
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        
+        pagination = User.query.paginate(page=page, per_page=per_page, error_out=False)
+        
         user_list = []
-        for user in users:
+        for user in pagination.items:
             is_admin_flag = user.email == 'admin@gmail.com' or getattr(user, 'is_admin', False)
             
             user_list.append({
@@ -144,9 +149,16 @@ def get_all_users():
                 "rating": user.rating,
                 "age": getattr(user, 'age', 'N/A'),
                 "is_admin": is_admin_flag,
-                "is_disabled": getattr(user, 'is_disabled', False) # NEW: Send status to frontend
+                "is_disabled": getattr(user, 'is_disabled', False)
             })
-        return jsonify(user_list), 200
+            
+        return jsonify({
+            "users": user_list,
+            "total_pages": pagination.pages,
+            "current_page": pagination.page,
+            "has_next": pagination.has_next,
+            "total_count": pagination.total
+        }), 200
     except Exception as e:
         return jsonify({"message": f"Server Error: {str(e)}"}), 500
     
@@ -155,7 +167,6 @@ def get_all_users():
 @admin_bp.route('/api/maintenance/rebuild-db-secret-key-123', methods=['GET'])
 def rebuild_database_live():
     try:
-        # This executes the wipe and rebuild without needing a terminal!
         db.drop_all() 
         db.create_all()
         return jsonify({

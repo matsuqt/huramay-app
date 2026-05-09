@@ -38,6 +38,9 @@ def handle_items():
         except Exception as e:
             return jsonify({"message": f"Server Error: {str(e)}"}), 500
     
+    # --- GET LOGIC WITH PAGINATION ---
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
     status_filter = request.args.get('status')
     search_keyword = request.args.get('search')
     dept_filter = request.args.get('department') 
@@ -51,8 +54,14 @@ def handle_items():
         search_term = f"%{search_keyword}%"
         query = query.filter(Item.title.ilike(search_term) | Item.description.ilike(search_term))
         
-    all_items = query.all()
-    return jsonify([_item_to_dict(i) for i in all_items])
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    
+    return jsonify({
+        "items": [_item_to_dict(i) for i in pagination.items],
+        "total_pages": pagination.pages,
+        "current_page": pagination.page,
+        "has_next": pagination.has_next
+    })
 
 @item_bp.route('/api/items/user/<int:user_id>', methods=['GET'])
 def get_user_items(user_id):

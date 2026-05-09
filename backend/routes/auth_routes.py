@@ -21,8 +21,9 @@ def register():
         if not re.match(r'^[a-zA-Z\s\.]+$', full_name_input):
             return jsonify({"message": "Name cannot contain numbers, special characters, or emojis"}), 400
 
-        if not re.match(r'^[a-zA-Z0-9._]+@gmail\.com$', email_input):
-            return jsonify({"message": "Email contains special characters or emojis, or is not a @gmail.com address"}), 400
+        # UPDATED: Allows both standard Gmail and the performance testing dummy domain
+        if not re.match(r'^[a-zA-Z0-9._]+@(gmail\.com|huramay-dummy\.local)$', email_input):
+            return jsonify({"message": "Email must be a @gmail.com or @huramay-dummy.local address"}), 400
             
         if re.search(r'[^\x00-\x7F]', password_input):
             return jsonify({"message": "Password cannot contain emojis"}), 400
@@ -51,7 +52,7 @@ def login():
     user = User.query.filter_by(email=data['email']).first()
     
     if user and bcrypt.check_password_hash(user.password, data['password']):
-        # NEW: Block disabled users from logging in
+        # Block disabled users from logging in
         if getattr(user, 'is_disabled', False):
             return jsonify({"message": "Your account has been disabled by an administrator."}), 403
             
