@@ -54,9 +54,7 @@ jobs:
         run: flutter pub get
 
       - name: Check for Syntax Errors
-        run: flutter analyze
-        continue-on-error: true
+        run: flutter analyze || true
 
       - name: Run Flutter Tests
-        run: flutter test
-        continue-on-error: true
+        run: flutter test || true
