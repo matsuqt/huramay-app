@@ -232,7 +232,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 child: _isLoading 
                                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: accentYellow, strokeWidth: 2))
-                                  : const Text("Sign In", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                  : const Text("Login", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -289,13 +289,64 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscureConf = true;
   bool _isLoading = false;
 
+  // --- NEW: Real-time validation variables ---
+  String _passwordHelperText = "";
+  Color _passwordHelperColor = Colors.transparent;
+  bool _isPasswordsMatch = false;
+
   final List<String> _lnuDepartments = [
     'Bachelor of Elementary Education', 'Bachelor of Early Childhood Education', 'Bachelor of Special Needs Education', 'Bachelor of Technology and Livelihood Education', 'Bachelor of Physical Education', 'Bachelor of Secondary Education major in English', 'Bachelor of Secondary Education major in Filipino', 'Bachelor of Secondary Education major in Mathematics', 'Bachelor of Secondary Education major in Science', 'Bachelor of Secondary Education major in Social Studies', 'Bachelor of Secondary Education major in Values Education', 'Teacher Certificate Program (TCP)', 'Bachelor of Library and Information Science', 'Bachelor of Arts in Communication', 'Bachelor of Music in Music Education', 'Bachelor of Science in Information Technology', 'Bachelor of Arts in English Language', 'Bachelor of Arts in Political Science', 'Bachelor of Science in Biology', 'Bachelor of Science in Social Work', 'Bachelor of Science in Tourism Management', 'Bachelor of Science in Hospitality Management', 'Bachelor of Science in Entrepreneurship', 'Faculty / Staff'
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    // --- NEW: Attach listeners to monitor keystrokes ---
+    _passCtrl.addListener(_checkPasswordMatch);
+    _confCtrl.addListener(_checkPasswordMatch);
+  }
+
+  @override
+  void dispose() {
+    _passCtrl.dispose();
+    _confCtrl.dispose();
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    _colorCtrl.dispose();
+    _songCtrl.dispose();
+    super.dispose();
+  }
+
+  // --- NEW: The real-time matching logic ---
+  void _checkPasswordMatch() {
+    String password = _passCtrl.text;
+    String confirmPassword = _confCtrl.text;
+
+    setState(() {
+      if (password.isEmpty && confirmPassword.isEmpty) {
+        // Criteria 1: Initial State
+        _passwordHelperText = "";
+        _isPasswordsMatch = false;
+      } else if (confirmPassword.isNotEmpty && password != confirmPassword) {
+        // Criteria 2 & 4: Mismatch or Re-Edit
+        _passwordHelperText = "Passwords do not match";
+        _passwordHelperColor = Colors.red;
+        _isPasswordsMatch = false;
+      } else if (confirmPassword.isNotEmpty && password == confirmPassword) {
+        // Criteria 3: Exact Match
+        _passwordHelperText = "Passwords match!";
+        _passwordHelperColor = Colors.green.shade600;
+        _isPasswordsMatch = true;
+      } else {
+        _passwordHelperText = "";
+        _isPasswordsMatch = false;
+      }
+    });
+  }
+
   Future<void> doSignup() async {
     if (!_formKey.currentState!.validate()) {
-      showErrorToast(context, "Please fix the form errors before submitting.");
+      showErrorToast(context, "Please fill up the form before submitting.");
       return;
     }
     if (_selectedDept == null) {
@@ -450,7 +501,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
               TextFormField(
                 controller: _passCtrl,
                 obscureText: _obscurePass,
-                autovalidateMode: AutovalidateMode.onUserInteraction, // Live validation as user types
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 style: const TextStyle(color: textDark, fontWeight: FontWeight.w500),
                 decoration: modernInputDecoration("••••••••", suffixIcon: IconButton(
                   icon: Icon(_obscurePass ? Icons.visibility_off : Icons.visibility, color: textLight, size: 20),
@@ -458,15 +509,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 )),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Password is required';
-                  
-                  // LIVE VALIDATION CHECKS
                   if (v.length < 8 || v.length > 12) return 'Must be between 8 and 12 characters.';
                   if (!v.contains(RegExp(r'[A-Z]'))) return 'Must include at least 1 uppercase letter.';
                   if (!v.contains(RegExp(r'[a-z]'))) return 'Must include at least 1 lowercase letter.';
                   if (!v.contains(RegExp(r'[0-9]'))) return 'Must include at least 1 number.';
                   if (!v.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>]'))) return 'Must include at least 1 special character (e.g. @, #, \$, &).';
                   if (v.contains(RegExp(r'[^\x00-\x7F]'))) return 'Standard characters only. No emojis allowed.';
-                  
                   return null;
                 },
               ),
@@ -490,16 +538,33 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 },
               ),
               
+              // --- NEW: Dynamic Helper Text UI ---
+              if (_passwordHelperText.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0, left: 4.0),
+                  child: Text(
+                    _passwordHelperText,
+                    style: TextStyle(
+                      color: _passwordHelperColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              
               const SizedBox(height: 40),
+              
               SizedBox(
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : doSignup,
+                  // --- NEW: Button is disabled if passwords do not match or if loading ---
+                  onPressed: (!_isPasswordsMatch || _isLoading) ? null : doSignup,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryBlue,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    disabledBackgroundColor: Colors.grey.shade300, // Visual feedback for locked button
                   ),
                   child: _isLoading 
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: accentYellow, strokeWidth: 2))
