@@ -128,17 +128,14 @@ def hard_delete_user(user_id):
         db.session.rollback()
         return jsonify({"message": "Error deleting user", "error": str(e)}), 500
 
-# ==================== UPDATED: PAGINATED GET USERS ====================
+# ==================== UPDATED: GET ALL USERS (NO PAGINATION) ====================
 @admin_bp.route('/api/users', methods=['GET'])
 def get_all_users():
     try:
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 20, type=int)
-        
-        pagination = User.query.paginate(page=page, per_page=per_page, error_out=False)
+        users = User.query.all()
         
         user_list = []
-        for user in pagination.items:
+        for user in users:
             is_admin_flag = user.email == 'admin@gmail.com' or getattr(user, 'is_admin', False)
             
             user_list.append({
@@ -152,13 +149,7 @@ def get_all_users():
                 "is_disabled": getattr(user, 'is_disabled', False)
             })
             
-        return jsonify({
-            "users": user_list,
-            "total_pages": pagination.pages,
-            "current_page": pagination.page,
-            "has_next": pagination.has_next,
-            "total_count": pagination.total
-        }), 200
+        return jsonify(user_list), 200
     except Exception as e:
         return jsonify({"message": f"Server Error: {str(e)}"}), 500
     
