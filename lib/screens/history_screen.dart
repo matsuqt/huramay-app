@@ -39,7 +39,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     setState(() => isLoading = true);
     try {
       final res = await http.get(
-        Uri.parse('https://huramay-app.onrender.com/api/borrow/history/${currentUser!['id']}'),
+        Uri.parse('http://192.168.137.1:5000/api/borrow/history/${currentUser!['id']}'),
       );
       if (res.statusCode == 200) {
         setState(() {
@@ -327,7 +327,7 @@ class _HistoryDetailOverlayState extends State<HistoryDetailOverlay> {
   Future<void> _fetchItemReviews() async {
     try {
       int itemId = widget.historyData['item']['id'];
-      final res = await http.get(Uri.parse('https://huramay-app.onrender.com/api/reviews/item/$itemId'));
+      final res = await http.get(Uri.parse('http://192.168.137.1:5000/api/reviews/item/$itemId'));
 
       if (res.statusCode == 200) {
         if (mounted) {
@@ -352,7 +352,7 @@ class _HistoryDetailOverlayState extends State<HistoryDetailOverlay> {
     setState(() => isSubmitting = true);
     try {
       final res = await http.post(
-        Uri.parse('https://huramay-app.onrender.com/api/review'),
+        Uri.parse('http://192.168.137.1:5000/api/review'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'reviewer_id': currentUser!['id'],

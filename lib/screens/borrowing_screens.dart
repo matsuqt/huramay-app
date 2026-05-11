@@ -41,7 +41,7 @@ class _RequestsScreenState extends State<RequestsScreen> {
     setState(() => isLoading = true);
     try {
       final res = await http.get(
-        Uri.parse('https://huramay-app.onrender.com/api/borrow/requests/owner/${currentUser!['id']}'),
+        Uri.parse('http://192.168.137.1:5000/api/borrow/requests/owner/${currentUser!['id']}'),
       );
       
       if (res.statusCode == 200) {
@@ -157,7 +157,7 @@ class _RequestCardState extends State<_RequestCard> {
   Future<void> _updateStatus(String newStatus) async {
     try {
       final res = await http.put(
-        Uri.parse('https://huramay-app.onrender.com/api/borrow/request/${widget.requestData['id']}'),
+        Uri.parse('http://192.168.137.1:5000/api/borrow/request/${widget.requestData['id']}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'status': newStatus}),
       );
@@ -728,7 +728,7 @@ class _TermsScreenState extends State<TermsScreen> {
     setState(() => _isSubmitting = true);
     try {
       final res = await http.post(
-        Uri.parse('https://huramay-app.onrender.com/api/borrow/request'),
+        Uri.parse('http://192.168.137.1:5000/api/borrow/request'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(widget.borrowData),
       );

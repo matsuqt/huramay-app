@@ -92,6 +92,8 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
   List<dynamic> allItems = [];
   bool isLoading = true;
   final TextEditingController _searchCtrl = TextEditingController();
+  
+  String _currentFilter = 'All';
 
   @override
   void initState() {
@@ -102,7 +104,7 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
   Future<void> _fetchAllItems() async {
     setState(() => isLoading = true);
     try {
-      String url = 'https://huramay-app.onrender.com/api/items';
+      String url = 'http://192.168.137.1:5000/api/items';
       String searchQuery = _searchCtrl.text.trim();
       if (searchQuery.isNotEmpty) {
         url += '?search=${Uri.encodeComponent(searchQuery)}';
@@ -110,8 +112,10 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
 
       final res = await http.get(Uri.parse(url));
       if (res.statusCode == 200) {
+        var decodedData = jsonDecode(res.body);
+        
         setState(() {
-          allItems = jsonDecode(res.body);
+          allItems = decodedData is List ? decodedData : (decodedData['items'] ?? decodedData['data'] ?? []);
         });
       }
     } catch (e) {
@@ -123,7 +127,7 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
 
   Future<void> _executeDelete(int itemId) async {
     try {
-      final res = await http.delete(Uri.parse('https://huramay-app.onrender.com/api/items/$itemId'));
+      final res = await http.delete(Uri.parse('http://192.168.137.1:5000/api/items/$itemId'));
       if (res.statusCode == 200) {
         _fetchAllItems();
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Item Deleted permanently.")));
@@ -182,8 +186,151 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
     );
   }
 
+  // --- NEW: Helper to show detailed item overlay when card is clicked ---
+  void _showItemDetailsModal(dynamic item) {
+    ImageProvider? safeImg = _getSafeImage(item['image']);
+    String statusStr = item['status']?.toString().toLowerCase() ?? '';
+    bool isFlagged = statusStr == 'flagged';
+    bool isBorrowed = statusStr == 'borrowed';
+
+    Color badgeBgColor = isFlagged ? Colors.red.shade50 : (isBorrowed ? Colors.orange.shade50 : Colors.green.shade50);
+    Color badgeBorderColor = isFlagged ? Colors.red.shade200 : (isBorrowed ? Colors.orange.shade200 : Colors.green.shade200);
+    Color badgeTextColor = isFlagged ? Colors.red.shade700 : (isBorrowed ? Colors.orange.shade700 : Colors.green.shade700);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(24),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text("Item Details", style: TextStyle(color: textDark, fontWeight: FontWeight.w800, fontSize: 18)),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(ctx),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(color: bgGray, shape: BoxShape.circle, border: Border.all(color: borderGrey)),
+                        child: const Icon(Icons.close, size: 20, color: textLight),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                if (safeImg != null)
+                  Container(
+                    height: 200, width: double.infinity,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      image: DecorationImage(image: safeImg, fit: BoxFit.cover),
+                    ),
+                  )
+                else
+                  Container(
+                    height: 150, width: double.infinity,
+                    decoration: BoxDecoration(color: bgGray, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderGrey)),
+                    child: const Icon(Icons.image_outlined, size: 48, color: textLight),
+                  ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(item['title'] ?? 'No Title', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: textDark)),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(color: badgeBgColor, borderRadius: BorderRadius.circular(20), border: Border.all(color: badgeBorderColor)),
+                      child: Text(item['status'] ?? 'Unknown', style: TextStyle(color: badgeTextColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                    )
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _detailRow(Icons.person_outline, "Owner", item['owner'] ?? 'Unknown'),
+                _detailRow(Icons.domain, "Department", item['dept'] ?? 'Unknown'),
+                _detailRow(Icons.inventory_2_outlined, "Condition", item['condition'] ?? 'Unknown'),
+                _detailRow(Icons.format_list_numbered, "Quantity", item['quantity']?.toString() ?? '1'),
+                const SizedBox(height: 16),
+                const Text("Description", style: TextStyle(fontWeight: FontWeight.bold, color: textDark, fontSize: 14)),
+                const SizedBox(height: 8),
+                Text(item['description'] ?? 'No description provided.', style: const TextStyle(color: textLight, fontSize: 14, height: 1.5)),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryBlue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    child: const Text("Close", style: TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                )
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _detailRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: textLight),
+          const SizedBox(width: 8),
+          Text("$label: ", style: const TextStyle(color: textLight, fontSize: 13)),
+          Expanded(child: Text(value, style: const TextStyle(color: textDark, fontWeight: FontWeight.w600, fontSize: 13))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatRow(String label, String count, Color color) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(width: 90, child: Text(label, style: const TextStyle(color: textDark, fontSize: 13, fontWeight: FontWeight.w600))),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+          child: Text(count, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
+        )
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    int totalItems = allItems.length;
+    int availableItems = allItems.where((item) => item['status']?.toString().toLowerCase() == 'available').length;
+    int borrowedItems = allItems.where((item) => item['status']?.toString().toLowerCase() == 'borrowed').length;
+
+    List<dynamic> itemsToDisplay = allItems;
+    if (_currentFilter == 'Available') {
+      itemsToDisplay = allItems.where((item) => item['status']?.toString().toLowerCase() == 'available').toList();
+    } else if (_currentFilter == 'Borrowed') {
+      itemsToDisplay = allItems.where((item) => item['status']?.toString().toLowerCase() == 'borrowed').toList();
+    }
+
     return Scaffold(
       backgroundColor: bgGray,
       appBar: AppBar(
@@ -241,20 +388,73 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(24, 24, 24, 16),
-                child: Text("Item Reports", style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: textDark, letterSpacing: -0.5)),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text("Items Feed", style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: textDark, letterSpacing: -0.5)),
+                    
+                    Container(
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: borderGrey),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2))],
+                      ),
+                      child: PopupMenuButton<String>(
+                        offset: const Offset(0, 40),
+                        color: Colors.white,
+                        surfaceTintColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        onSelected: (String newValue) {
+                          setState(() {
+                            _currentFilter = newValue;
+                          });
+                        },
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          child: Row(
+                            children: [
+                              Icon(Icons.analytics_outlined, size: 18, color: primaryBlue),
+                              SizedBox(width: 6),
+                              Text("Stats", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+                              SizedBox(width: 4),
+                              Icon(Icons.keyboard_arrow_down, size: 18, color: textLight),
+                            ],
+                          ),
+                        ),
+                        itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                          PopupMenuItem<String>(
+                            value: 'All', 
+                            child: _buildStatRow("Total Items", totalItems.toString(), Colors.blueGrey),
+                          ),
+                          const PopupMenuDivider(),
+                          PopupMenuItem<String>(
+                            value: 'Available',
+                            child: _buildStatRow("Available", availableItems.toString(), Colors.green.shade600),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'Borrowed',
+                            child: _buildStatRow("Borrowed", borrowedItems.toString(), Colors.orange.shade700),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
               Expanded(
                 child: isLoading
                     ? const Center(child: CircularProgressIndicator(color: primaryBlue))
-                    : allItems.isEmpty
+                    : itemsToDisplay.isEmpty 
                         ? _emptyState()
                         : ListView.builder(
                             physics: const BouncingScrollPhysics(),
                             padding: const EdgeInsets.only(bottom: 24),
-                            itemCount: allItems.length,
-                            itemBuilder: (context, index) => _buildAdminCard(allItems[index]),
+                            itemCount: itemsToDisplay.length, 
+                            itemBuilder: (context, index) => _buildAdminCard(itemsToDisplay[index]), 
                           ),
               ),
             ],
@@ -283,10 +483,18 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
 
   Widget _buildAdminCard(dynamic item) {
     ImageProvider? safeImg = _getSafeImage(item['image']);
-    bool isFlagged = item['status']?.toString().toLowerCase() == 'flagged';
+    
+    String statusStr = item['status']?.toString().toLowerCase() ?? '';
+    bool isFlagged = statusStr == 'flagged';
+    bool isBorrowed = statusStr == 'borrowed';
+
+    Color badgeBgColor = isFlagged ? Colors.red.shade50 : (isBorrowed ? Colors.orange.shade50 : Colors.green.shade50);
+    Color badgeBorderColor = isFlagged ? Colors.red.shade200 : (isBorrowed ? Colors.orange.shade200 : Colors.green.shade200);
+    Color badgeTextColor = isFlagged ? Colors.red.shade700 : (isBorrowed ? Colors.orange.shade700 : Colors.green.shade700);
 
     return GestureDetector(
-      onTap: () => _openAdminReportModal(item), 
+      // --- NEW: Card tap now opens the detailed view instead of the report form! ---
+      onTap: () => _showItemDetailsModal(item), 
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
         padding: const EdgeInsets.all(16),
@@ -339,13 +547,13 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: isFlagged ? Colors.red.shade50 : Colors.green.shade50,
+                          color: badgeBgColor,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: isFlagged ? Colors.red.shade200 : Colors.green.shade200, width: 1),
+                          border: Border.all(color: badgeBorderColor, width: 1),
                         ),
                         child: Text(
                           item['status'],
-                          style: TextStyle(color: isFlagged ? Colors.red.shade700 : Colors.green.shade700, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 0.5),
+                          style: TextStyle(color: badgeTextColor, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 0.5),
                         ),
                       ),
                     ],
@@ -366,6 +574,7 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
+                        // --- Review and Delete buttons work exactly as they did before ---
                         _modernAdminBtn("Review", Colors.white, textDark, () { _openAdminReportModal(item); }, isOutlined: true),
                         const SizedBox(width: 8),
                         _modernAdminBtn("Delete", Colors.red.shade50, Colors.red.shade700, () {
@@ -423,10 +632,12 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
   Future<void> _fetchUsers() async {
     setState(() => isLoading = true);
     try {
-      final res = await http.get(Uri.parse('https://huramay-app.onrender.com/api/users'));
+      final res = await http.get(Uri.parse('http://192.168.137.1:5000/api/users'));
       if (res.statusCode == 200) {
+        var decodedData = jsonDecode(res.body);
+        
         setState(() {
-          allUsers = jsonDecode(res.body);
+          allUsers = decodedData is List ? decodedData : (decodedData['users'] ?? decodedData['data'] ?? []);
           filteredUsers = List.from(allUsers);
         });
         _applySorting(); 
@@ -477,7 +688,7 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
   Future<void> _executeToggleDisable(dynamic user) async {
     int userId = user['id'];
     try {
-      final res = await http.put(Uri.parse('https://huramay-app.onrender.com/api/users/$userId/toggle_disable'));
+      final res = await http.put(Uri.parse('http://192.168.137.1:5000/api/users/$userId/toggle_disable'));
       final data = jsonDecode(res.body);
       
       if (res.statusCode == 200) {
@@ -533,7 +744,7 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
 
   Future<void> _executeHardDelete(int userId) async {
     try {
-      final res = await http.delete(Uri.parse('https://huramay-app.onrender.com/api/users/$userId/hard_delete'));
+      final res = await http.delete(Uri.parse('http://192.168.137.1:5000/api/users/$userId/hard_delete'));
       if (res.statusCode == 200) {
         _fetchUsers();
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User completely wiped from database.")));
@@ -884,7 +1095,7 @@ class _AdminReportOverlayState extends State<AdminReportOverlay> {
     setState(() => isSubmitting = true);
     try {
       final res = await http.post(
-        Uri.parse('https://huramay-app.onrender.com/api/report'),
+        Uri.parse('http://192.168.137.1:5000/api/report'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'reporter_id': currentUser!['id'], 
@@ -1119,7 +1330,7 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
   Future<void> _fetchAdmins() async {
     setState(() => isLoading = true);
     try {
-      final res = await http.get(Uri.parse('https://huramay-app.onrender.com/api/admins'));
+      final res = await http.get(Uri.parse('http://192.168.137.1:5000/api/admins'));
       if (res.statusCode == 200) {
         setState(() => adminList = jsonDecode(res.body));
       }
@@ -1137,7 +1348,7 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
     }
 
     try {
-      final res = await http.delete(Uri.parse('https://huramay-app.onrender.com/api/admins/$id'));
+      final res = await http.delete(Uri.parse('http://192.168.137.1:5000/api/admins/$id'));
       if (res.statusCode == 200) {
         _fetchAdmins();
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Admin account deleted.")));
@@ -1239,7 +1450,7 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
                       setModalState(() => isSubmitting = true);
                       try {
                         final res = await http.post(
-                          Uri.parse('https://huramay-app.onrender.com/api/admins/create'),
+                          Uri.parse('http://192.168.137.1:5000/api/admins/create'),
                           headers: {'Content-Type': 'application/json'},
                           body: jsonEncode({
                             'full_name': _nameCtrl.text.trim(),

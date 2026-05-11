@@ -39,13 +39,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _setupFCMToken(); 
   }
 
-  // --- THE SAFETY NET (VAVT-87) ---
   ImageProvider? _getSafeImage(String? base64Str) {
     if (base64Str == null || base64Str.isEmpty || base64Str.length < 100) return null;
     try {
       return MemoryImage(base64Decode(base64Str));
     } catch (e) {
-      return null; // Fallback to safe icon if the image is poisoned/local path
+      return null; 
     }
   }
 
@@ -58,7 +57,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (token != null && currentUser != null) {
         debugPrint("📱 FIREBASE DEVICE TOKEN: $token"); 
         await http.post(
-          Uri.parse('https://huramay-app.onrender.com/api/user/update_token'),
+          Uri.parse('http://192.168.137.1:5000/api/user/update_token'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'user_id': currentUser!['id'],
@@ -74,7 +73,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _fetchItems() async {
     setState(() => isLoading = true);
     try {
-      String url = 'https://huramay-app.onrender.com/api/items';
+      String url = 'http://192.168.137.1:5000/api/items';
       List<String> queryParams = [];
       
       if (_currentFilter != null && _currentFilter != 'All') {
@@ -103,7 +102,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // VAVT-87: Apply safety net to the user's profile picture
     ImageProvider? profileImg = _getSafeImage(currentUser?['photo_path']);
 
     return Scaffold(
@@ -133,7 +131,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         actions: [
-          // Dynamic Profile Picture Button
           GestureDetector(
             onTap: () => Navigator.push(
               context,
@@ -313,9 +310,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _itemCard(BuildContext context, dynamic item) {
-    // VAVT-87: Apply the safety net here
     ImageProvider? safeImg = _getSafeImage(item['image']);
-    bool isAvailable = item['status']?.toString().toLowerCase() == 'available';
+    
+    // --- NEW: Sync dashboard colors to Admin side colors ---
+    String statusStr = item['status']?.toString().toLowerCase() ?? '';
+    bool isAvailable = statusStr == 'available';
+    bool isBorrowed = statusStr == 'borrowed';
+
+    Color badgeBgColor = isAvailable ? Colors.green.shade50 : (isBorrowed ? Colors.orange.shade50 : Colors.red.shade50);
+    Color badgeBorderColor = isAvailable ? Colors.green.shade200 : (isBorrowed ? Colors.orange.shade200 : Colors.red.shade200);
+    Color badgeTextColor = isAvailable ? Colors.green.shade700 : (isBorrowed ? Colors.orange.shade700 : Colors.red.shade700);
 
     return GestureDetector(
       onTap: () {
@@ -342,7 +346,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image Container
             Container(
               width: 80,
               height: 80,
@@ -350,7 +353,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 color: bgGray,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: borderGrey, width: 1), 
-                // VAVT-87: Display safely
                 image: safeImg != null 
                   ? DecorationImage(image: safeImg, fit: BoxFit.cover) 
                   : null,
@@ -359,7 +361,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(width: 16),
             
-            // Text Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -375,18 +376,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      // Modern Status Pill
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: isAvailable ? Colors.green.shade50 : Colors.red.shade50,
+                          color: badgeBgColor,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: isAvailable ? Colors.green.shade200 : Colors.red.shade200, width: 1),
+                          border: Border.all(color: badgeBorderColor, width: 1),
                         ),
                         child: Text(
                           item['status'],
                           style: TextStyle(
-                            color: isAvailable ? Colors.green.shade700 : Colors.red.shade700, 
+                            color: badgeTextColor, 
                             fontWeight: FontWeight.bold, 
                             fontSize: 10,
                             letterSpacing: 0.5,

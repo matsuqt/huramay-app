@@ -106,7 +106,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       var res = await http.post(
-        Uri.parse('https://huramay-app.onrender.com/api/login'), 
+        Uri.parse('http://192.168.137.1:5000/api/login'), 
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': _emailCtrl.text.trim(), 'password': _passCtrl.text}),
       );
@@ -120,7 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
           String? fcmToken = await FirebaseMessaging.instance.getToken();
           if (fcmToken != null) {
             await http.post(
-              Uri.parse('https://huramay-app.onrender.com/api/user/update_token'),
+              Uri.parse('http://192.168.137.1:5000/api/user/update_token'),
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode({
                 'user_id': data['id'],
@@ -359,7 +359,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     
     try {
       var res = await http.post(
-        Uri.parse('https://huramay-app.onrender.com/api/register'),
+        Uri.parse('http://192.168.137.1:5000/api/register'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'full_name': _nameCtrl.text.trim(), 
@@ -618,7 +618,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isLoading = true);
     try {
       var res = await http.post(
-        Uri.parse('https://huramay-app.onrender.com/api/user/update'),
+        Uri.parse('http://192.168.137.1:5000/api/user/update'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'id': currentUser!['id'], 'photo_path': _imageBase64 ?? ""}),
       );
@@ -827,7 +827,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
     setState(() => _isLoading = true);
     try {
       var res = await http.post(
-        Uri.parse('https://huramay-app.onrender.com/api/user/reset_password'),
+        Uri.parse('http://192.168.137.1:5000/api/user/reset_password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': _emailCtrl.text, 'new_password': _passCtrl.text, 'current_user_id': currentUser!['id']}),
       );
@@ -935,7 +935,7 @@ class _UniversalRecoveryScreenState extends State<UniversalRecoveryScreen> {
     setState(() => _isLoading = true);
     try {
       var res = await http.post(
-        Uri.parse('https://huramay-app.onrender.com/api/user/recover_account'),
+        Uri.parse('http://192.168.137.1:5000/api/user/recover_account'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': _emailCtrl.text.trim(),

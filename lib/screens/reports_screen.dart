@@ -33,7 +33,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   Future<void> _fetchAllReports() async {
     try {
-      final res = await http.get(Uri.parse('https://huramay-app.onrender.com/api/reports/all'));
+      final res = await http.get(Uri.parse('http://192.168.137.1:5000/api/reports/all'));
       if (res.statusCode == 200) {
         if (mounted) {
           setState(() {

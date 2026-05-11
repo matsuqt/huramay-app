@@ -20,13 +20,12 @@ const Color borderGrey = Color(0xFFE5E7EB);
 const Color bgGray = Color(0xFFF8FAFC);
 
 // ==================== SAFETY NET HELPER ====================
-// VAVT-87: This prevents the app from crashing if a bad image path gets into the database
 ImageProvider? getSafeImage(String? base64Str) {
   if (base64Str == null || base64Str.isEmpty || base64Str.length < 100) return null;
   try {
     return MemoryImage(base64Decode(base64Str));
   } catch (e) {
-    return null; // Fallback to empty icon if decoding fails
+    return null; 
   }
 }
 
@@ -58,7 +57,7 @@ class _DepartmentScreenState extends State<DepartmentScreen> {
   Future<void> _fetchDepartmentItems() async {
     setState(() => isLoading = true);
     try {
-      String url = 'https://huramay-app.onrender.com/api/items';
+      String url = 'http://192.168.137.1:5000/api/items';
       List<String> queryParams = [];
       
       if (_selectedDeptFilter != null) {
@@ -233,7 +232,7 @@ class _DeptItemCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: borderGrey),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,7 +297,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Future<void> _fetchFavorites() async {
     setState(() => isLoading = true);
     try {
-      final res = await http.get(Uri.parse('https://huramay-app.onrender.com/api/favorites/${currentUser!['id']}'));
+      final res = await http.get(Uri.parse('http://192.168.137.1:5000/api/favorites/${currentUser!['id']}'));
       if (res.statusCode == 200) {
         setState(() => items = jsonDecode(res.body));
       }
@@ -312,7 +311,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Future<void> _unfavorite(int itemId) async {
     try {
       await http.post(
-        Uri.parse('https://huramay-app.onrender.com/api/favorites/toggle'),
+        Uri.parse('http://192.168.137.1:5000/api/favorites/toggle'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': currentUser!['id'], 'item_id': itemId}),
       );
@@ -336,7 +335,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       drawer: const AppSidebar(),
       body: Stack(
         children: [
-          Positioned(top: -80, right: -60, child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withValues(alpha: 0.03)))),
+          Positioned(top: -80, right: -60, child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withOpacity(0.03)))),
           
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -395,7 +394,7 @@ class _FavoriteCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderGrey),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -462,7 +461,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
   Future<void> _checkIfFavorited() async {
     try {
       final res = await http.post(
-        Uri.parse('https://huramay-app.onrender.com/api/favorites/check'), 
+        Uri.parse('http://192.168.137.1:5000/api/favorites/check'), 
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': currentUser!['id'], 'item_id': widget.item['id']}),
       );
@@ -477,7 +476,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
   Future<void> _toggleFavorite() async {
     try {
       final res = await http.post(
-        Uri.parse('https://huramay-app.onrender.com/api/favorites/toggle'), 
+        Uri.parse('http://192.168.137.1:5000/api/favorites/toggle'), 
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': currentUser!['id'], 'item_id': widget.item['id']}),
       );
@@ -521,7 +520,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(color: borderGrey, width: 1),
                       image: safeImg != null ? DecorationImage(image: safeImg, fit: BoxFit.cover) : null,
-                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, 10))],
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 10))],
                     ),
                     child: safeImg == null ? const Icon(Icons.image_outlined, size: 64, color: textLight) : null,
                   ),
@@ -533,7 +532,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: Colors.white, shape: BoxShape.circle, border: Border.all(color: borderGrey),
-                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4))],
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
                         ),
                         child: Icon(_isFavorited ? Icons.favorite : Icons.favorite_border, color: _isFavorited ? Colors.red : textLight, size: 24),
                       ),
@@ -549,7 +548,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: borderGrey),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))]
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))]
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -584,16 +583,28 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
             ),
             const SizedBox(height: 32),
 
-            ElevatedButton(
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => BorrowingFormScreen(item: widget.item))),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: primaryBlue, foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 56),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 0,
-              ),
-              child: const Text("Continue Borrowing", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-            ),
+            isAvailable
+              ? ElevatedButton(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => BorrowingFormScreen(item: widget.item))),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryBlue, foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 56),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 0,
+                  ),
+                  child: const Text("Continue Borrowing", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                )
+              : ElevatedButton(
+                  onPressed: null, 
+                  style: ElevatedButton.styleFrom(
+                    disabledBackgroundColor: Colors.grey.shade300, 
+                    disabledForegroundColor: Colors.grey.shade600,
+                    minimumSize: const Size(double.infinity, 56),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 0,
+                  ),
+                  child: const Text("Currently Unavailable", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                ),
             const SizedBox(height: 24),
           ],
         ),
@@ -604,7 +615,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
   Widget _detailLabel(String t) => Text(t, style: const TextStyle(color: textLight, fontWeight: FontWeight.w600, fontSize: 12, letterSpacing: 0.5));
   Widget _detailValue(String v, {bool isLight = false}) => Padding(
     padding: const EdgeInsets.only(top: 6),
-    child: Text(v, style: TextStyle(color: isLight ? textDark.withValues(alpha: 0.8) : textDark, fontWeight: isLight ? FontWeight.w500 : FontWeight.bold, fontSize: 15, height: 1.4)),
+    child: Text(v, style: TextStyle(color: isLight ? textDark.withOpacity(0.8) : textDark, fontWeight: isLight ? FontWeight.w500 : FontWeight.bold, fontSize: 15, height: 1.4)),
   );
 }
 
@@ -628,7 +639,7 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
   Future<void> _fetchMyItems() async {
     setState(() => isLoading = true);
     try {
-      final res = await http.get(Uri.parse('https://huramay-app.onrender.com/api/items/user/${currentUser!['id']}'));
+      final res = await http.get(Uri.parse('http://192.168.137.1:5000/api/items/user/${currentUser!['id']}'));
       if (res.statusCode == 200) {
         setState(() => items = jsonDecode(res.body));
       }
@@ -641,7 +652,7 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
 
   Future<void> _deleteItem(int id) async {
     try {
-      await http.delete(Uri.parse('https://huramay-app.onrender.com/api/items/$id'));
+      await http.delete(Uri.parse('http://192.168.137.1:5000/api/items/$id'));
       _fetchMyItems();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Delete failed")));
@@ -682,7 +693,7 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
       drawer: const AppSidebar(),
       body: Stack(
         children: [
-          Positioned(top: -80, right: -60, child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withValues(alpha: 0.03)))),
+          Positioned(top: -80, right: -60, child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withOpacity(0.03)))),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -767,7 +778,7 @@ class _MyItemCardState extends State<_MyItemCard> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderGrey),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -875,9 +886,6 @@ class _EditItemScreenState extends State<EditItemScreen> {
   String? _itemPhotoPath;
   bool _isUpdating = false;
 
-  final List<String> _lnuDepartments = [
-    'Bachelor of Elementary Education', 'Bachelor of Early Childhood Education', 'Bachelor of Special Needs Education', 'Bachelor of Technology and Livelihood Education', 'Bachelor of Physical Education', 'Bachelor of Secondary Education major in English', 'Bachelor of Secondary Education major in Filipino', 'Bachelor of Secondary Education major in Mathematics', 'Bachelor of Secondary Education major in Science', 'Bachelor of Secondary Education major in Social Studies', 'Bachelor of Secondary Education major in Values Education', 'Teacher Certificate Program (TCP)', 'Bachelor of Library and Information Science', 'Bachelor of Arts in Communication', 'Bachelor of Music in Music Education', 'Bachelor of Science in Information Technology', 'Bachelor of Arts in English Language', 'Bachelor of Arts in Political Science', 'Bachelor of Science in Biology', 'Bachelor of Science in Social Work', 'Bachelor of Science in Tourism Management', 'Bachelor of Science in Hospitality Management', 'Bachelor of Science in Entrepreneurship', 'Faculty / Staff'
-  ];
   final List<String> _conditions = ['New', 'Like New', 'Good', 'Fair', 'Poor'];
   final List<String> _statuses = ['Available', 'Borrowed', 'Lost', 'Flagged'];
 
@@ -893,7 +901,6 @@ class _EditItemScreenState extends State<EditItemScreen> {
     if (_itemPhotoPath != null && _itemPhotoPath!.isEmpty) _itemPhotoPath = null;
   }
 
-  // VAVT-87: Compress and Convert to Base64 instantly
   Future<void> _pickImage() async {
     final image = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 20);
     if (image != null) {
@@ -919,7 +926,7 @@ class _EditItemScreenState extends State<EditItemScreen> {
     setState(() => _isUpdating = true);
     try {
       await http.put(
-        Uri.parse('https://huramay-app.onrender.com/api/items/${widget.item['id']}'),
+        Uri.parse('http://192.168.137.1:5000/api/items/${widget.item['id']}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'title': titleText,
@@ -986,8 +993,11 @@ class _EditItemScreenState extends State<EditItemScreen> {
             _formLabel("Owner"),
             Padding(padding: const EdgeInsets.only(left: 4, bottom: 12), child: Text(widget.item['owner'], style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: textLight))),
             
+            // --- NEW: Display Department as uneditable text ---
+            _formLabel("Department"),
+            Padding(padding: const EdgeInsets.only(left: 4, bottom: 12), child: Text(widget.item['dept'], style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: textLight))),
+
             _formLabel("Item Name"), _formInput(_titleCtrl),
-            _formLabel("Department"), _formDropdown(_selectedDept, _lnuDepartments, (v) => setState(() => _selectedDept = v)),
             _formLabel("Description"), _formInput(_descCtrl, maxLines: 3),
             
             Row(
@@ -1058,7 +1068,6 @@ class _AddItemScreenState extends State<AddItemScreen> {
   bool _isPosting = false;
   final List<String> _conditions = ['New', 'Like New', 'Good', 'Fair', 'Poor'];
 
-  // VAVT-87: Compress and Convert to Base64 instantly
   Future<void> _pickItemImage() async {
     final image = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 20);
     if (image != null) {
@@ -1086,7 +1095,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
     setState(() => _isPosting = true);
     try {
       final res = await http.post(
-        Uri.parse('https://huramay-app.onrender.com/api/items'),
+        Uri.parse('http://192.168.137.1:5000/api/items'),
         headers: {'Content-Type': 'application/json'},  
         body: jsonEncode({
           'title': titleText,
