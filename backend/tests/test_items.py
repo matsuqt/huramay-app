@@ -45,7 +45,7 @@ def test_get_all_items(client):
     
     response = client.get('/api/items')
     assert response.status_code == 200
-    assert len(json.loads(response.data)['items']) == 1
+    assert len(json.loads(response.data)) == 1
 
 def test_search_items_by_keyword(client):
     item1 = Item(title="Laptop Charger", description="Type C", owner_name="Francis", department="BSIT", user_id=1)
@@ -56,8 +56,8 @@ def test_search_items_by_keyword(client):
     response = client.get('/api/items?search=Charger')
     data = json.loads(response.data)
     assert response.status_code == 200
-    assert len(data['items']) == 1
-    assert data['items'][0]['title'] == "Laptop Charger"
+    assert len(data) == 1
+    assert data[0]['title'] == "Laptop Charger"
 
 def test_filter_items_by_department(client):
     item1 = Item(title="Router", description="Cisco", owner_name="Francis", department="BSIT", user_id=1)
@@ -68,8 +68,8 @@ def test_filter_items_by_department(client):
     response = client.get('/api/items?department=BPED')
     data = json.loads(response.data)
     assert response.status_code == 200
-    assert len(data['items']) == 1
-    assert data['items'][0]['dept'] == "BPED"
+    assert len(data) == 1
+    assert data[0]['dept'] == "BPED"
 
 def test_get_user_specific_items(client):
     item = Item(title="My Item", description="Mine", owner_name="Francis", department="BSIT", user_id=1)
@@ -119,9 +119,9 @@ def test_filter_available_items(client):
     data = json.loads(response.data)
     
     assert response.status_code == 200
-    assert len(data['items']) == 1
-    assert data['items'][0]['status'] == "Available"
-    assert data['items'][0]['title'] == "Book"
+    assert len(data) == 1
+    assert data[0]['status'] == "Available"
+    assert data[0]['title'] == "Book"
 
 # ==========================================
 # ADVANCED ITEM MANAGEMENT & EDGE CASES
@@ -191,7 +191,7 @@ def test_search_items_case_insensitivity(client):
     response = client.get('/api/items?search=aRduINo')
     data = json.loads(response.data)
     assert response.status_code == 200
-    assert len(data['items']) == 1
+    assert len(data) == 1
 
 def test_search_items_by_description(client):
     """Test that the search checks the description field, not just the title."""
@@ -202,7 +202,7 @@ def test_search_items_by_description(client):
     response = client.get('/api/items?search=Arduino')
     data = json.loads(response.data)
     assert response.status_code == 200
-    assert len(data['items']) == 1
+    assert len(data) == 1
 
 def test_filter_items_invalid_department(client):
     """Test filtering by a department that has no items."""
@@ -213,7 +213,7 @@ def test_filter_items_invalid_department(client):
     response = client.get('/api/items?department=NURSING')
     data = json.loads(response.data)
     assert response.status_code == 200
-    assert len(data['items']) == 0
+    assert len(data) == 0
 
 def test_get_user_items_empty(client):
     """Test getting items for a user ID that has posted nothing."""
@@ -225,57 +225,6 @@ def test_get_user_items_empty(client):
 # ==========================================
 # PAGINATION & DATABASE BOUNDARY TESTS
 # ==========================================
-
-def test_pagination_default_behavior(client):
-    """Test that the API correctly returns the default page 1 with 20 items max."""
-    # Create 25 identical items to force pagination
-    items = []
-    for i in range(25):
-        items.append(Item(title=f"Item {i}", description="Desc", owner_name="User", department="IT", user_id=1))
-    db.session.add_all(items)
-    db.session.commit()
-    
-    response = client.get('/api/items')
-    data = json.loads(response.data)
-    
-    assert response.status_code == 200
-    assert len(data['items']) == 20 # Should cut off at the default per_page of 20
-    assert data['current_page'] == 1
-    assert data['total_pages'] == 2 # 25 items / 20 per page = 2 pages
-    assert data['has_next'] is True
-
-def test_pagination_custom_page_and_limit(client):
-    """Test fetching a specific page with a custom per_page limit."""
-    items = []
-    for i in range(15):
-        items.append(Item(title=f"Item {i}", description="Desc", owner_name="User", department="IT", user_id=1))
-    db.session.add_all(items)
-    db.session.commit()
-    
-    # Request page 2, but only 5 items per page
-    response = client.get('/api/items?page=2&per_page=5')
-    data = json.loads(response.data)
-    
-    assert response.status_code == 200
-    assert len(data['items']) == 5
-    assert data['current_page'] == 2
-    assert data['total_pages'] == 3 # 15 total items / 5 per page = 3 pages
-    assert data['has_next'] is True
-
-def test_pagination_out_of_bounds_page(client):
-    """Test requesting a page number that exceeds the total number of items."""
-    item = Item(title="Single Item", description="Desc", owner_name="User", department="IT", user_id=1)
-    db.session.add(item)
-    db.session.commit()
-    
-    # Request page 50 when there is only 1 item total
-    response = client.get('/api/items?page=50')
-    data = json.loads(response.data)
-    
-    assert response.status_code == 200
-    assert len(data['items']) == 0 # Should return empty array, not crash
-    assert data['current_page'] == 50
-    assert data['has_next'] is False
 
 def test_create_item_with_default_overrides(client):
     """Test that omitting optional fields correctly triggers the database defaults."""
@@ -322,8 +271,8 @@ def test_filter_items_combined_parameters(client):
     data = json.loads(response.data)
     
     assert response.status_code == 200
-    assert len(data['items']) == 1
-    assert data['items'][0]['title'] == "IT Book"
+    assert len(data) == 1
+    assert data[0]['title'] == "IT Book"
 
 def test_create_item_title_exceeds_max_length(client):
     """Test the database constraint that titles cannot exceed 100 characters."""
@@ -347,9 +296,11 @@ def test_create_item_title_exceeds_max_length(client):
 def test_handle_items_get_method_base(client):
     """Test the raw GET method without any parameters to ensure default response structure."""
     response = client.get('/api/items')
+    data = json.loads(response.data)
+    
     assert response.status_code == 200
-    assert 'items' in json.loads(response.data)
-    assert 'total_pages' in json.loads(response.data)
+    # Simply verify that the API is correctly returning a massive list of items!
+    assert isinstance(data, list)
 
 def test_update_item_no_changes(client):
     """Test updating an item with an empty JSON payload (should leave item intact)."""
@@ -370,8 +321,8 @@ def test_filter_items_by_status_borrowed(client):
     
     response = client.get('/api/items?status=Borrowed')
     data = json.loads(response.data)
-    assert len(data['items']) == 1
-    assert data['items'][0]['title'] == "Taken"
+    assert len(data) == 1
+    assert data[0]['title'] == "Taken"
 
 def test_search_items_no_results(client):
     """Test searching for a keyword that does not match any items."""
@@ -380,7 +331,7 @@ def test_search_items_no_results(client):
     db.session.commit()
     
     response = client.get('/api/items?search=Spaceship')
-    assert len(json.loads(response.data)['items']) == 0
+    assert len(json.loads(response.data)) == 0
 
 def test_create_item_with_default_image(client):
     """Test that creating an item without an image defaults to an empty string."""

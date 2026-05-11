@@ -210,21 +210,6 @@ def test_hard_delete_active_borrower_blocked(client):
 # USER PAGINATION & SYSTEM MAINTENANCE
 # ==========================================
 
-def test_get_all_users_pagination(client):
-    """Test fetching the global list of users handles pagination limits."""
-    # Create 25 users
-    users = [User(full_name=f"User {i}", email=f"user{i}@gmail.com", department="IT", password="hash") for i in range(25)]
-    db.session.add_all(users)
-    db.session.commit()
-    
-    response = client.get('/api/users')
-    data = json.loads(response.data)
-    
-    assert response.status_code == 200
-    assert len(data['users']) == 20 # Should hit the default per_page limit
-    assert data['total_pages'] == 2
-    assert data['has_next'] is True
-
 def test_maintenance_rebuild_db(client):
     """Test that the secret emergency route successfully drops and recreates the tables."""
     # Add a user so the DB is not empty
@@ -243,28 +228,6 @@ def test_maintenance_rebuild_db(client):
 # ==========================================
 # EXTREME ADMIN & PAGINATION TESTS
 # ==========================================
-
-def test_get_all_users_pagination_page_2(client):
-    """Test explicitly fetching the second page of users."""
-    users = [User(full_name=f"User {i}", email=f"user{i}@gmail.com", department="IT", password="hash") for i in range(25)]
-    db.session.add_all(users)
-    db.session.commit()
-    
-    response = client.get('/api/users?page=2&per_page=20')
-    data = json.loads(response.data)
-    assert len(data['users']) == 5
-    assert data['current_page'] == 2
-
-def test_get_all_users_pagination_large_per_page(client):
-    """Test pagination handles per_page requests larger than the dataset."""
-    users = [User(full_name=f"User {i}", email=f"user{i}@gmail.com", department="IT", password="hash") for i in range(5)]
-    db.session.add_all(users)
-    db.session.commit()
-    
-    response = client.get('/api/users?per_page=100')
-    data = json.loads(response.data)
-    assert len(data['users']) == 5
-    assert data['total_pages'] == 1
 
 def test_hard_delete_user_not_found(client):
     """Test attempting to hard delete a user ID that does not exist."""

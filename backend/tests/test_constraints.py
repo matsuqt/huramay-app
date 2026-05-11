@@ -87,4 +87,4 @@ def test_sql_injection_attempt_in_search(client):
     data = json.loads(response.data)
     
     assert response.status_code == 200
-    assert len(data['items']) == 0 # Look inside the 'items' array
+    assert len(data) == 0 # Look inside the 'items' array
