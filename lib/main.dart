@@ -3,13 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'screens/auth_screens.dart';
+import 'firebase_options.dart';
 
 // 1. NEW: Create a Global Key so we can force a popup banner from anywhere in the app
 final GlobalKey<ScaffoldMessengerState> globalMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized(); 
-  await Firebase.initializeApp(); 
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   // Request Android 13+ Permissions
   FirebaseMessaging messaging = FirebaseMessaging.instance;
