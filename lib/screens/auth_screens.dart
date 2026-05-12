@@ -78,7 +78,7 @@ InputDecoration modernInputDecoration(String hint, {Widget? suffixIcon}) {
     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: primaryBlue, width: 1.5)),
     errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.red.shade300)),
     errorStyle: TextStyle(color: Colors.red.shade400, fontWeight: FontWeight.w600, fontSize: 12),
-    errorMaxLines: 2, // Added to allow longer validation messages
+    errorMaxLines: 2, 
     suffixIcon: suffixIcon,
   );
 }
@@ -106,7 +106,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       var res = await http.post(
-        Uri.parse('http://192.168.137.1:5000/api/login'), 
+        Uri.parse('http://10.198.13.39:5000/api/login'), 
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': _emailCtrl.text.trim(), 'password': _passCtrl.text}),
       );
@@ -120,7 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
           String? fcmToken = await FirebaseMessaging.instance.getToken();
           if (fcmToken != null) {
             await http.post(
-              Uri.parse('http://192.168.137.1:5000/api/user/update_token'),
+              Uri.parse('http://10.198.13.39:5000/api/user/update_token'),
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode({
                 'user_id': data['id'],
@@ -289,7 +289,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscureConf = true;
   bool _isLoading = false;
 
-  // --- NEW: Real-time validation variables ---
   String _passwordHelperText = "";
   Color _passwordHelperColor = Colors.transparent;
   bool _isPasswordsMatch = false;
@@ -301,7 +300,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   void initState() {
     super.initState();
-    // --- NEW: Attach listeners to monitor keystrokes ---
     _passCtrl.addListener(_checkPasswordMatch);
     _confCtrl.addListener(_checkPasswordMatch);
   }
@@ -317,23 +315,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
-  // --- NEW: The real-time matching logic ---
   void _checkPasswordMatch() {
     String password = _passCtrl.text;
     String confirmPassword = _confCtrl.text;
 
     setState(() {
       if (password.isEmpty && confirmPassword.isEmpty) {
-        // Criteria 1: Initial State
         _passwordHelperText = "";
         _isPasswordsMatch = false;
       } else if (confirmPassword.isNotEmpty && password != confirmPassword) {
-        // Criteria 2 & 4: Mismatch or Re-Edit
         _passwordHelperText = "Passwords do not match";
         _passwordHelperColor = Colors.red;
         _isPasswordsMatch = false;
       } else if (confirmPassword.isNotEmpty && password == confirmPassword) {
-        // Criteria 3: Exact Match
         _passwordHelperText = "Passwords match!";
         _passwordHelperColor = Colors.green.shade600;
         _isPasswordsMatch = true;
@@ -359,7 +353,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     
     try {
       var res = await http.post(
-        Uri.parse('http://192.168.137.1:5000/api/register'),
+        Uri.parse('http://10.198.13.39:5000/api/register'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'full_name': _nameCtrl.text.trim(), 
@@ -538,7 +532,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 },
               ),
               
-              // --- NEW: Dynamic Helper Text UI ---
               if (_passwordHelperText.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 8.0, left: 4.0),
@@ -557,14 +550,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
               SizedBox(
                 height: 52,
                 child: ElevatedButton(
-                  // --- NEW: Button is disabled if passwords do not match or if loading ---
                   onPressed: (!_isPasswordsMatch || _isLoading) ? null : doSignup,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryBlue,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    disabledBackgroundColor: Colors.grey.shade300, // Visual feedback for locked button
+                    disabledBackgroundColor: Colors.grey.shade300, 
                   ),
                   child: _isLoading 
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: accentYellow, strokeWidth: 2))
@@ -618,7 +610,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isLoading = true);
     try {
       var res = await http.post(
-        Uri.parse('http://192.168.137.1:5000/api/user/update'),
+        Uri.parse('http://10.198.13.39:5000/api/user/update'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'id': currentUser!['id'], 'photo_path': _imageBase64 ?? ""}),
       );
@@ -802,7 +794,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-// ==================== PASSWORD RESET SCREEN ====================
+// ==================== PASSWORD RESET SCREEN (UPDATE PASSWORD) ====================
 class PasswordResetScreen extends StatefulWidget {
   const PasswordResetScreen({super.key});
   @override
@@ -810,24 +802,70 @@ class PasswordResetScreen extends StatefulWidget {
 }
 
 class _PasswordResetScreenState extends State<PasswordResetScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _confCtrl = TextEditingController();
+  
   bool _isLoading = false;
+  bool _obscurePass = true;
+  bool _obscureConf = true;
+
+  // --- NEW: Real-time validation variables ---
+  String _passwordHelperText = "";
+  Color _passwordHelperColor = Colors.transparent;
+  bool _isPasswordsMatch = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // --- NEW: Attach listeners to monitor keystrokes ---
+    _passCtrl.addListener(_checkPasswordMatch);
+    _confCtrl.addListener(_checkPasswordMatch);
+  }
+
+  @override
+  void dispose() {
+    _passCtrl.dispose();
+    _confCtrl.dispose();
+    _emailCtrl.dispose();
+    super.dispose();
+  }
+
+  // --- NEW: The real-time matching logic ---
+  void _checkPasswordMatch() {
+    String password = _passCtrl.text;
+    String confirmPassword = _confCtrl.text;
+
+    setState(() {
+      if (password.isEmpty && confirmPassword.isEmpty) {
+        _passwordHelperText = "";
+        _isPasswordsMatch = false;
+      } else if (confirmPassword.isNotEmpty && password != confirmPassword) {
+        _passwordHelperText = "Passwords do not match";
+        _passwordHelperColor = Colors.red;
+        _isPasswordsMatch = false;
+      } else if (confirmPassword.isNotEmpty && password == confirmPassword) {
+        _passwordHelperText = "Passwords match!";
+        _passwordHelperColor = Colors.green.shade600;
+        _isPasswordsMatch = true;
+      } else {
+        _passwordHelperText = "";
+        _isPasswordsMatch = false;
+      }
+    });
+  }
 
   Future<void> doReset() async {
-    if (_emailCtrl.text.isEmpty || _passCtrl.text.isEmpty) {
-      showErrorToast(context, "Please fill in all fields.");
+    if (!_formKey.currentState!.validate()) {
+      showErrorToast(context, "Please fix the errors before submitting.");
       return;
     }
-    if (_passCtrl.text != _confCtrl.text) {
-      showErrorToast(context, "New passwords do not match.");
-      return;
-    }
+    
     setState(() => _isLoading = true);
     try {
       var res = await http.post(
-        Uri.parse('http://192.168.137.1:5000/api/user/reset_password'),
+        Uri.parse('http://10.198.13.39:5000/api/user/reset_password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': _emailCtrl.text, 'new_password': _passCtrl.text, 'current_user_id': currentUser!['id']}),
       );
@@ -860,45 +898,99 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text("Update Password", style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: textDark, letterSpacing: -0.5)),
-            const SizedBox(height: 8),
-            const Text("Ensure your account is using a secure password.", style: TextStyle(fontSize: 14, color: textLight)),
-            const SizedBox(height: 40),
-            
-            const Text("Email Address", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
-            const SizedBox(height: 8),
-            TextField(controller: _emailCtrl, decoration: modernInputDecoration("Enter registered email")),
-            const SizedBox(height: 20),
-            
-            const Text("New Password", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
-            const SizedBox(height: 8),
-            TextField(controller: _passCtrl, obscureText: true, decoration: modernInputDecoration("••••••••")),
-            const SizedBox(height: 20),
-            
-            const Text("Confirm Password", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
-            const SizedBox(height: 8),
-            TextField(controller: _confCtrl, obscureText: true, decoration: modernInputDecoration("••••••••")),
-            const SizedBox(height: 40),
-            
-            SizedBox(
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : doReset,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryBlue,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                child: _isLoading 
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: accentYellow, strokeWidth: 2)) 
-                  : const Text("Save Password", style: TextStyle(fontWeight: FontWeight.w600)),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text("Update Password", style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: textDark, letterSpacing: -0.5)),
+              const SizedBox(height: 8),
+              const Text("Ensure your account is using a secure password.", style: TextStyle(fontSize: 14, color: textLight)),
+              const SizedBox(height: 40),
+              
+              const Text("Email Address", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _emailCtrl, 
+                decoration: modernInputDecoration("Enter registered email"),
+                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
               ),
-            )
-          ],
+              const SizedBox(height: 20),
+              
+              const Text("New Password", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _passCtrl, 
+                obscureText: _obscurePass, 
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                decoration: modernInputDecoration("••••••••", suffixIcon: IconButton(
+                  icon: Icon(_obscurePass ? Icons.visibility_off : Icons.visibility, color: textLight, size: 20),
+                  onPressed: () => setState(() => _obscurePass = !_obscurePass),
+                )),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Password is required';
+                  if (v.length < 8 || v.length > 12) return 'Must be between 8 and 12 characters.';
+                  if (!v.contains(RegExp(r'[A-Z]'))) return 'Must include at least 1 uppercase letter.';
+                  if (!v.contains(RegExp(r'[a-z]'))) return 'Must include at least 1 lowercase letter.';
+                  if (!v.contains(RegExp(r'[0-9]'))) return 'Must include at least 1 number.';
+                  if (!v.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>]'))) return 'Must include at least 1 special character (e.g. @, #, \$, &).';
+                  if (v.contains(RegExp(r'[^\x00-\x7F]'))) return 'Standard characters only. No emojis allowed.';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 20),
+              
+              const Text("Confirm Password", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _confCtrl, 
+                obscureText: _obscureConf, 
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                decoration: modernInputDecoration("••••••••", suffixIcon: IconButton(
+                  icon: Icon(_obscureConf ? Icons.visibility_off : Icons.visibility, color: textLight, size: 20),
+                  onPressed: () => setState(() => _obscureConf = !_obscureConf),
+                )),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Please confirm your password';
+                  if (v != _passCtrl.text) return 'Passwords do not match';
+                  return null;
+                },
+              ),
+
+              // --- NEW: Dynamic Helper Text UI ---
+              if (_passwordHelperText.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0, left: 4.0),
+                  child: Text(
+                    _passwordHelperText,
+                    style: TextStyle(
+                      color: _passwordHelperColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+
+              const SizedBox(height: 40),
+              
+              SizedBox(
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: (!_isPasswordsMatch || _isLoading) ? null : doReset,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryBlue,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    disabledBackgroundColor: Colors.grey.shade300, 
+                  ),
+                  child: _isLoading 
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: accentYellow, strokeWidth: 2)) 
+                    : const Text("Save Password", style: TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              )
+            ],
+          ),
         ),
       ),
     );
@@ -913,6 +1005,7 @@ class UniversalRecoveryScreen extends StatefulWidget {
 }
 
 class _UniversalRecoveryScreenState extends State<UniversalRecoveryScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _colorCtrl = TextEditingController();
   final _songCtrl = TextEditingController();
@@ -921,25 +1014,69 @@ class _UniversalRecoveryScreenState extends State<UniversalRecoveryScreen> {
   
   bool _isLoading = false;
   bool _obscurePass = true;
+  bool _obscureConf = true;
+
+  // --- NEW: Real-time validation variables ---
+  String _passwordHelperText = "";
+  Color _passwordHelperColor = Colors.transparent;
+  bool _isPasswordsMatch = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // --- NEW: Attach listeners to monitor keystrokes ---
+    _newPassCtrl.addListener(_checkPasswordMatch);
+    _confPassCtrl.addListener(_checkPasswordMatch);
+  }
+
+  @override
+  void dispose() {
+    _newPassCtrl.dispose();
+    _confPassCtrl.dispose();
+    _emailCtrl.dispose();
+    _colorCtrl.dispose();
+    _songCtrl.dispose();
+    super.dispose();
+  }
+
+  // --- NEW: The real-time matching logic ---
+  void _checkPasswordMatch() {
+    String password = _newPassCtrl.text;
+    String confirmPassword = _confPassCtrl.text;
+
+    setState(() {
+      if (password.isEmpty && confirmPassword.isEmpty) {
+        _passwordHelperText = "";
+        _isPasswordsMatch = false;
+      } else if (confirmPassword.isNotEmpty && password != confirmPassword) {
+        _passwordHelperText = "Passwords do not match";
+        _passwordHelperColor = Colors.red;
+        _isPasswordsMatch = false;
+      } else if (confirmPassword.isNotEmpty && password == confirmPassword) {
+        _passwordHelperText = "Passwords match!";
+        _passwordHelperColor = Colors.green.shade600;
+        _isPasswordsMatch = true;
+      } else {
+        _passwordHelperText = "";
+        _isPasswordsMatch = false;
+      }
+    });
+  }
 
   Future<void> _submitRecovery() async {
-    if (_emailCtrl.text.isEmpty || _colorCtrl.text.isEmpty || _songCtrl.text.isEmpty || _newPassCtrl.text.isEmpty) {
-      showErrorToast(context, "Please fill in all fields to recover your account.");
-      return;
-    }
-    if (_newPassCtrl.text != _confPassCtrl.text) {
-      showErrorToast(context, "Passwords do not match.");
+    if (!_formKey.currentState!.validate()) {
+      showErrorToast(context, "Please fix the errors before recovering your account.");
       return;
     }
 
     setState(() => _isLoading = true);
     try {
       var res = await http.post(
-        Uri.parse('http://192.168.137.1:5000/api/user/recover_account'),
+        Uri.parse('http://10.198.13.39:5000/api/user/recover_account'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': _emailCtrl.text.trim(),
-          'security_color': _colorCtrl.text.trim(),
+          'security_color': _colorCtrl.text.trim().toLowerCase(),
           'security_song': _songCtrl.text.trim(),
           'new_password': _newPassCtrl.text
         }),
@@ -951,7 +1088,7 @@ class _UniversalRecoveryScreenState extends State<UniversalRecoveryScreen> {
           Navigator.pop(context); // Send them back to the login screen
         }
       } else {
-        if (mounted) showErrorToast(context, data['message']); // E.g., "Security answers incorrect"
+        if (mounted) showErrorToast(context, data['message']); 
       }
     } catch (e) {
       if (mounted) showErrorToast(context, "Connection Error.");
@@ -973,78 +1110,131 @@ class _UniversalRecoveryScreenState extends State<UniversalRecoveryScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Icon(Icons.lock_reset, size: 64, color: primaryBlue),
-            const SizedBox(height: 24),
-            const Text("Recover Password", textAlign: TextAlign.center, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: textDark, letterSpacing: -0.5)),
-            const SizedBox(height: 8),
-            const Text("Answer your security questions to set a new password.", textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: textLight)),
-            const SizedBox(height: 40),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Icon(Icons.lock_reset, size: 64, color: primaryBlue),
+              const SizedBox(height: 24),
+              const Text("Recover Password", textAlign: TextAlign.center, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: textDark, letterSpacing: -0.5)),
+              const SizedBox(height: 8),
+              const Text("Answer your security questions to set a new password.", textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: textLight)),
+              const SizedBox(height: 40),
 
-            // EMAIL
-            const Text("Email Address", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _emailCtrl,
-              decoration: modernInputDecoration("your.email@gmail.com"),
-            ),
-            const SizedBox(height: 24),
-
-            // SECURITY QUESTIONS
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: bgGray, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderGrey)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text("Security Verification", style: TextStyle(fontWeight: FontWeight.bold, color: primaryBlue)),
-                  const SizedBox(height: 16),
-                  const Text("What is your favorite color?", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textDark)),
-                  const SizedBox(height: 8),
-                  TextField(controller: _colorCtrl, decoration: modernInputDecoration("Enter your answer")),
-                  const SizedBox(height: 16),
-                  const Text("What is your favorite song?", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textDark)),
-                  const SizedBox(height: 8),
-                  TextField(controller: _songCtrl, decoration: modernInputDecoration("Enter your answer")),
-                ],
+              // EMAIL
+              const Text("Email Address", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _emailCtrl,
+                decoration: modernInputDecoration("your.email@gmail.com"),
+                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // NEW PASSWORD
-            const Text("New Password", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _newPassCtrl,
-              obscureText: _obscurePass,
-              decoration: modernInputDecoration("••••••••", suffixIcon: IconButton(
-                icon: Icon(_obscurePass ? Icons.visibility_off : Icons.visibility, color: textLight, size: 20),
-                onPressed: () => setState(() => _obscurePass = !_obscurePass),
-              )),
-            ),
-            const SizedBox(height: 16),
-            const Text("Confirm New Password", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _confPassCtrl,
-              obscureText: _obscurePass,
-              decoration: modernInputDecoration("••••••••"),
-            ),
-            const SizedBox(height: 32),
-
-            SizedBox(
-              height: 52,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _submitRecovery,
-                style: ElevatedButton.styleFrom(backgroundColor: primaryBlue, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                child: _isLoading 
-                  ? const CircularProgressIndicator(color: accentYellow)
-                  : const Text("Recover Account", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              // SECURITY QUESTIONS
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(color: bgGray, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderGrey)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Security Verification", style: TextStyle(fontWeight: FontWeight.bold, color: primaryBlue)),
+                    const SizedBox(height: 16),
+                    const Text("What is your favorite color?", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textDark)),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _colorCtrl, 
+                      decoration: modernInputDecoration("Enter your answer"),
+                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text("What is your favorite song?", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textDark)),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _songCtrl, 
+                      decoration: modernInputDecoration("Enter your answer"),
+                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 24),
+
+              // NEW PASSWORD
+              const Text("New Password", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _newPassCtrl,
+                obscureText: _obscurePass,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                decoration: modernInputDecoration("••••••••", suffixIcon: IconButton(
+                  icon: Icon(_obscurePass ? Icons.visibility_off : Icons.visibility, color: textLight, size: 20),
+                  onPressed: () => setState(() => _obscurePass = !_obscurePass),
+                )),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Password is required';
+                  if (v.length < 8 || v.length > 12) return 'Must be between 8 and 12 characters.';
+                  if (!v.contains(RegExp(r'[A-Z]'))) return 'Must include at least 1 uppercase letter.';
+                  if (!v.contains(RegExp(r'[a-z]'))) return 'Must include at least 1 lowercase letter.';
+                  if (!v.contains(RegExp(r'[0-9]'))) return 'Must include at least 1 number.';
+                  if (!v.contains(RegExp(r'[!@#\$%^&*(),.?":{}|<>]'))) return 'Must include at least 1 special character (e.g. @, #, \$, &).';
+                  if (v.contains(RegExp(r'[^\x00-\x7F]'))) return 'Standard characters only. No emojis allowed.';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              const Text("Confirm New Password", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _confPassCtrl,
+                obscureText: _obscureConf,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                decoration: modernInputDecoration("••••••••", suffixIcon: IconButton(
+                  icon: Icon(_obscureConf ? Icons.visibility_off : Icons.visibility, color: textLight, size: 20),
+                  onPressed: () => setState(() => _obscureConf = !_obscureConf),
+                )),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Please confirm your password';
+                  if (v != _newPassCtrl.text) return 'Passwords do not match';
+                  return null;
+                },
+              ),
+
+              // --- NEW: Dynamic Helper Text UI ---
+              if (_passwordHelperText.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0, left: 4.0),
+                  child: Text(
+                    _passwordHelperText,
+                    style: TextStyle(
+                      color: _passwordHelperColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+
+              const SizedBox(height: 32),
+
+              SizedBox(
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: (!_isPasswordsMatch || _isLoading) ? null : _submitRecovery,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primaryBlue, 
+                    foregroundColor: Colors.white, 
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    disabledBackgroundColor: Colors.grey.shade300, 
+                  ),
+                  child: _isLoading 
+                    ? const CircularProgressIndicator(color: accentYellow)
+                    : const Text("Recover Account", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

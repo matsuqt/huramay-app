@@ -23,6 +23,30 @@ ImageProvider? _getSafeImage(String? base64Str) {
   }
 }
 
+// --- Global Top Notification Helper ---
+void _showTopNotification(BuildContext context, String message, {bool isSuccess = true}) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      elevation: 0,
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: isSuccess ? Colors.green.shade600 : Colors.red.shade700,
+      margin: EdgeInsets.only(
+        bottom: MediaQuery.of(context).size.height - 140, 
+        left: 20, 
+        right: 20,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      content: Row(
+        children: [
+          Icon(isSuccess ? Icons.check_circle : Icons.error_outline, color: Colors.white),
+          const SizedBox(width: 12),
+          Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+        ],
+      ),
+    ),
+  );
+}
+
 // =========================================================================
 // 1. ADMIN DASHBOARD WRAPPER
 // =========================================================================
@@ -79,7 +103,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 }
 
 // =========================================================================
-// 2. ADMIN ITEMS FEED 
+// 2. ADMIN ITEMS FEED (WITH LAZY LOADING)
 // =========================================================================
 class AdminItemsFeed extends StatefulWidget {
   const AdminItemsFeed({super.key});
@@ -92,19 +116,57 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
   List<dynamic> allItems = [];
   bool isLoading = true;
   final TextEditingController _searchCtrl = TextEditingController();
-  
   String _currentFilter = 'All';
+
+  // --- NEW: Lazy Loading Variables ---
+  final ScrollController _scrollController = ScrollController();
+  int _displayCount = 10;
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
     super.initState();
     _fetchAllItems();
+    
+    // --- NEW: Scroll Listener to detect when at the bottom ---
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 50) {
+        _loadMoreItems();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // --- NEW: Load More Function ---
+  Future<void> _loadMoreItems() async {
+    // Only load if not already loading and we haven't reached the end of the list
+    if (_isLoadingMore || _displayCount >= allItems.length) return;
+
+    setState(() => _isLoadingMore = true);
+
+    // Simulate network delay to flash the loading icon
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    if (mounted) {
+      setState(() {
+        _displayCount += 10; // Load 10 more
+        _isLoadingMore = false;
+      });
+    }
   }
 
   Future<void> _fetchAllItems() async {
-    setState(() => isLoading = true);
+    setState(() {
+      isLoading = true;
+      _displayCount = 10; // Reset display count on fresh fetch
+    });
     try {
-      String url = 'http://192.168.137.1:5000/api/items';
+      String url = 'http://10.198.13.39:5000/api/items';
       String searchQuery = _searchCtrl.text.trim();
       if (searchQuery.isNotEmpty) {
         url += '?search=${Uri.encodeComponent(searchQuery)}';
@@ -127,10 +189,10 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
 
   Future<void> _executeDelete(int itemId) async {
     try {
-      final res = await http.delete(Uri.parse('http://192.168.137.1:5000/api/items/$itemId'));
+      final res = await http.delete(Uri.parse('http://10.198.13.39:5000/api/items/$itemId'));
       if (res.statusCode == 200) {
         _fetchAllItems();
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Item Deleted permanently.")));
+        if (mounted) _showTopNotification(context, "Item Deleted permanently.");
       }
     } catch (e) {
       debugPrint("Delete error: $e");
@@ -186,7 +248,6 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
     );
   }
 
-  // --- NEW: Helper to show detailed item overlay when card is clicked ---
   void _showItemDetailsModal(dynamic item) {
     ImageProvider? safeImg = _getSafeImage(item['image']);
     String statusStr = item['status']?.toString().toLowerCase() ?? '';
@@ -324,12 +385,17 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
     int availableItems = allItems.where((item) => item['status']?.toString().toLowerCase() == 'available').length;
     int borrowedItems = allItems.where((item) => item['status']?.toString().toLowerCase() == 'borrowed').length;
 
-    List<dynamic> itemsToDisplay = allItems;
+    // 1. Filter the entire list first
+    List<dynamic> filteredList = allItems;
     if (_currentFilter == 'Available') {
-      itemsToDisplay = allItems.where((item) => item['status']?.toString().toLowerCase() == 'available').toList();
+      filteredList = allItems.where((item) => item['status']?.toString().toLowerCase() == 'available').toList();
     } else if (_currentFilter == 'Borrowed') {
-      itemsToDisplay = allItems.where((item) => item['status']?.toString().toLowerCase() == 'borrowed').toList();
+      filteredList = allItems.where((item) => item['status']?.toString().toLowerCase() == 'borrowed').toList();
     }
+
+    // 2. Slice the list for lazy loading (only show up to _displayCount)
+    List<dynamic> itemsToDisplay = filteredList.take(_displayCount).toList();
+    bool hasMoreData = itemsToDisplay.length < filteredList.length;
 
     return Scaffold(
       backgroundColor: bgGray,
@@ -411,6 +477,7 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
                         onSelected: (String newValue) {
                           setState(() {
                             _currentFilter = newValue;
+                            _displayCount = 10; // Reset lazy load when changing tabs
                           });
                         },
                         child: const Padding(
@@ -451,10 +518,23 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
                     : itemsToDisplay.isEmpty 
                         ? _emptyState()
                         : ListView.builder(
+                            controller: _scrollController, // --- NEW: Attach scroll controller ---
                             physics: const BouncingScrollPhysics(),
                             padding: const EdgeInsets.only(bottom: 24),
-                            itemCount: itemsToDisplay.length, 
-                            itemBuilder: (context, index) => _buildAdminCard(itemsToDisplay[index]), 
+                            // --- NEW: Add +1 to length if we are loading more or have more to load ---
+                            itemCount: itemsToDisplay.length + (hasMoreData ? 1 : 0), 
+                            itemBuilder: (context, index) {
+                              // If we hit the end of the loaded items, show the spinner
+                              if (index == itemsToDisplay.length) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 24),
+                                  child: Center(
+                                    child: CircularProgressIndicator(color: primaryBlue)
+                                  ),
+                                );
+                              }
+                              return _buildAdminCard(itemsToDisplay[index]);
+                            }, 
                           ),
               ),
             ],
@@ -493,7 +573,6 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
     Color badgeTextColor = isFlagged ? Colors.red.shade700 : (isBorrowed ? Colors.orange.shade700 : Colors.green.shade700);
 
     return GestureDetector(
-      // --- NEW: Card tap now opens the detailed view instead of the report form! ---
       onTap: () => _showItemDetailsModal(item), 
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -574,7 +653,6 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        // --- Review and Delete buttons work exactly as they did before ---
                         _modernAdminBtn("Review", Colors.white, textDark, () { _openAdminReportModal(item); }, isOutlined: true),
                         const SizedBox(width: 8),
                         _modernAdminBtn("Delete", Colors.red.shade50, Colors.red.shade700, () {
@@ -607,7 +685,7 @@ class _AdminItemsFeedState extends State<AdminItemsFeed> {
 }
 
 // =========================================================================
-// 3. USER MANAGEMENT SCREEN
+// 3. USER MANAGEMENT SCREEN (WITH LAZY LOADING)
 // =========================================================================
 class AdminUserListScreen extends StatefulWidget {
   const AdminUserListScreen({super.key});
@@ -623,16 +701,53 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _currentSort = 'Name (A-Z)';
 
+  // --- NEW: Lazy Loading Variables ---
+  final ScrollController _scrollController = ScrollController();
+  int _displayCount = 10;
+  bool _isLoadingMore = false;
+
   @override
   void initState() {
     super.initState();
     _fetchUsers();
+
+    // --- NEW: Scroll Listener ---
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 50) {
+        _loadMoreUsers();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // --- NEW: Load More Function ---
+  Future<void> _loadMoreUsers() async {
+    if (_isLoadingMore || _displayCount >= filteredUsers.length) return;
+
+    setState(() => _isLoadingMore = true);
+
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    if (mounted) {
+      setState(() {
+        _displayCount += 10;
+        _isLoadingMore = false;
+      });
+    }
   }
 
   Future<void> _fetchUsers() async {
-    setState(() => isLoading = true);
+    setState(() {
+      isLoading = true;
+      _displayCount = 10; // Reset lazy load
+    });
     try {
-      final res = await http.get(Uri.parse('http://192.168.137.1:5000/api/users'));
+      final res = await http.get(Uri.parse('http://10.198.13.39:5000/api/users'));
       if (res.statusCode == 200) {
         var decodedData = jsonDecode(res.body);
         
@@ -681,21 +796,24 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
         return nameLower.contains(searchLower) || emailLower.contains(searchLower) || deptLower.contains(searchLower);
       }).toList();
     }
-    setState(() => filteredUsers = results);
+    setState(() {
+      filteredUsers = results;
+      _displayCount = 10; // Reset lazy load on search
+    });
     _applySorting(); 
   }
 
   Future<void> _executeToggleDisable(dynamic user) async {
     int userId = user['id'];
     try {
-      final res = await http.put(Uri.parse('http://192.168.137.1:5000/api/users/$userId/toggle_disable'));
+      final res = await http.put(Uri.parse('http://10.198.13.39:5000/api/users/$userId/toggle_disable'));
       final data = jsonDecode(res.body);
       
       if (res.statusCode == 200) {
         _fetchUsers();
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'])));
+        if (mounted) _showTopNotification(context, data['message']);
       } else {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'])));
+        if (mounted) _showTopNotification(context, data['message'], isSuccess: false);
       }
     } catch (e) {
       debugPrint("Toggle disable error: $e");
@@ -744,13 +862,13 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
 
   Future<void> _executeHardDelete(int userId) async {
     try {
-      final res = await http.delete(Uri.parse('http://192.168.137.1:5000/api/users/$userId/hard_delete'));
+      final res = await http.delete(Uri.parse('http://10.198.13.39:5000/api/users/$userId/hard_delete'));
       if (res.statusCode == 200) {
         _fetchUsers();
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("User completely wiped from database.")));
+        if (mounted) _showTopNotification(context, "User completely wiped from database.");
       } else {
         final data = jsonDecode(res.body);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(data['message'], style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red.shade800));
+        if (mounted) _showTopNotification(context, data['message'], isSuccess: false);
       }
     } catch (e) {
       debugPrint("Delete error: $e");
@@ -823,6 +941,10 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // --- Slicing for lazy loading ---
+    List<dynamic> usersToDisplay = filteredUsers.take(_displayCount).toList();
+    bool hasMoreData = usersToDisplay.length < filteredUsers.length;
+
     return Scaffold(
       backgroundColor: bgGray,
       appBar: AppBar(
@@ -880,7 +1002,10 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
                         icon: const Icon(Icons.sort, color: textDark, size: 22),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         onSelected: (String newValue) {
-                          setState(() => _currentSort = newValue);
+                          setState(() {
+                            _currentSort = newValue;
+                            _displayCount = 10; // reset on sort
+                          });
                           _applySorting();
                         },
                         itemBuilder: (BuildContext context) => [
@@ -912,14 +1037,23 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
               Expanded(
                 child: isLoading
                     ? const Center(child: CircularProgressIndicator(color: primaryBlue))
-                    : filteredUsers.isEmpty
+                    : usersToDisplay.isEmpty
                         ? const Center(child: Text("No users match your search.", style: TextStyle(color: textLight)))
                         : ListView.builder(
+                            controller: _scrollController, // Attach listener
                             physics: const BouncingScrollPhysics(),
                             padding: const EdgeInsets.only(bottom: 24),
-                            itemCount: filteredUsers.length,
+                            itemCount: usersToDisplay.length + (hasMoreData ? 1 : 0),
                             itemBuilder: (context, index) {
-                              final user = filteredUsers[index];
+                              
+                              if (index == usersToDisplay.length) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 24),
+                                  child: Center(child: CircularProgressIndicator(color: primaryBlue)),
+                                );
+                              }
+
+                              final user = usersToDisplay[index];
                               String initials = user['full_name'].toString().isNotEmpty 
                                   ? user['full_name'].toString().substring(0, 1).toUpperCase() 
                                   : "?";
@@ -1025,7 +1159,7 @@ class _AdminReportOverlayState extends State<AdminReportOverlay> {
 
   void _handleReport() {
     if (_reportTextCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please type a report details first.")));
+      _showTopNotification(context, "Please type report details first.", isSuccess: false);
       return;
     }
     _showConfirmation(); 
@@ -1095,7 +1229,7 @@ class _AdminReportOverlayState extends State<AdminReportOverlay> {
     setState(() => isSubmitting = true);
     try {
       final res = await http.post(
-        Uri.parse('http://192.168.137.1:5000/api/report'),
+        Uri.parse('http://10.198.13.39:5000/api/report'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'reporter_id': currentUser!['id'], 
@@ -1105,7 +1239,7 @@ class _AdminReportOverlayState extends State<AdminReportOverlay> {
       );
       if (res.statusCode == 201) {
         if(mounted) Navigator.pop(context); 
-        if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Report submitted successfully.")));
+        if(mounted) _showTopNotification(context, "Report submitted successfully.");
         widget.onReportSubmitted(); 
       }
     } catch (e) {
@@ -1321,6 +1455,22 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
   bool isLoading = true;
   final String superAdminEmail = "admin@gmail.com"; 
 
+  // --- Exact Dropdown list from your frontend ---
+  final List<String> _lnuDepartments = [
+    'Bachelor of Elementary Education', 'Bachelor of Early Childhood Education', 
+    'Bachelor of Special Needs Education', 'Bachelor of Technology and Livelihood Education', 
+    'Bachelor of Physical Education', 'Bachelor of Secondary Education major in English', 
+    'Bachelor of Secondary Education major in Filipino', 'Bachelor of Secondary Education major in Mathematics', 
+    'Bachelor of Secondary Education major in Science', 'Bachelor of Secondary Education major in Social Studies', 
+    'Bachelor of Secondary Education major in Values Education', 'Teacher Certificate Program (TCP)', 
+    'Bachelor of Library and Information Science', 'Bachelor of Arts in Communication', 
+    'Bachelor of Music in Music Education', 'Bachelor of Science in Information Technology', 
+    'Bachelor of Arts in English Language', 'Bachelor of Arts in Political Science', 
+    'Bachelor of Science in Biology', 'Bachelor of Science in Social Work', 
+    'Bachelor of Science in Tourism Management', 'Bachelor of Science in Hospitality Management', 
+    'Bachelor of Science in Entrepreneurship', 'Faculty / Staff'
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -1330,7 +1480,7 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
   Future<void> _fetchAdmins() async {
     setState(() => isLoading = true);
     try {
-      final res = await http.get(Uri.parse('http://192.168.137.1:5000/api/admins'));
+      final res = await http.get(Uri.parse('http://10.198.13.39:5000/api/admins'));
       if (res.statusCode == 200) {
         setState(() => adminList = jsonDecode(res.body));
       }
@@ -1343,15 +1493,15 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
 
   Future<void> _deleteAdmin(int id, String email) async {
     if (email == superAdminEmail) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Action Denied: Cannot delete the Super Admin.")));
+      _showTopNotification(context, "Action Denied: Cannot delete the Super Admin.", isSuccess: false);
       return;
     }
 
     try {
-      final res = await http.delete(Uri.parse('http://192.168.137.1:5000/api/admins/$id'));
+      final res = await http.delete(Uri.parse('http://10.198.13.39:5000/api/admins/$id'));
       if (res.statusCode == 200) {
         _fetchAdmins();
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Admin account deleted.")));
+        if (mounted) _showTopNotification(context, "Admin account deleted.");
       }
     } catch (e) {
       debugPrint("Delete admin error: $e");
@@ -1363,7 +1513,14 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
     final _nameCtrl = TextEditingController();
     final _emailCtrl = TextEditingController();
     final _passCtrl = TextEditingController();
+    final _confirmPassCtrl = TextEditingController();
+    final _colorCtrl = TextEditingController();
+    final _songCtrl = TextEditingController();
+    
+    String? _selectedDept = 'Faculty / Staff'; 
     bool isSubmitting = false;
+    bool _obscurePass = true; 
+    bool _obscureConfirm = true;
 
     showDialog(
       context: context,
@@ -1375,64 +1532,190 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
             surfaceTintColor: Colors.transparent,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             title: const Text("Create New Admin", style: TextStyle(color: textDark, fontWeight: FontWeight.w800, fontSize: 18)),
-            content: SingleChildScrollView(
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFormField(
-                      controller: _nameCtrl,
-                      style: const TextStyle(fontSize: 14, color: textDark),
-                      decoration: InputDecoration(
-                        labelText: "Full Name", 
-                        labelStyle: const TextStyle(color: textLight),
-                        filled: true, fillColor: bgGray, 
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+            content: SizedBox(
+              width: double.maxFinite, 
+              child: SingleChildScrollView(
+                child: Form(
+                  key: _formKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction, 
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextFormField(
+                        controller: _nameCtrl,
+                        style: const TextStyle(fontSize: 14, color: textDark),
+                        decoration: InputDecoration(
+                          labelText: "Full Name", 
+                          labelStyle: const TextStyle(color: textLight),
+                          filled: true, fillColor: bgGray, 
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) return "Name is required";
+                          if (!RegExp(r'^[a-zA-Z\s.]+$').hasMatch(value)) return "No special characters/emojis";
+                          return null;
+                        },
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) return "Name is required";
-                        if (!RegExp(r'^[a-zA-Z\s.]+$').hasMatch(value)) return "No special characters/emojis";
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _emailCtrl,
-                      style: const TextStyle(fontSize: 14, color: textDark),
-                      decoration: InputDecoration(
-                        labelText: "Email Address", 
-                        labelStyle: const TextStyle(color: textLight),
-                        filled: true, fillColor: bgGray, 
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _emailCtrl,
+                        style: const TextStyle(fontSize: 14, color: textDark),
+                        decoration: InputDecoration(
+                          labelText: "Email Address", 
+                          labelStyle: const TextStyle(color: textLight),
+                          filled: true, fillColor: bgGray, 
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) return "Email is required";
+                          if (!RegExp(r'^[a-zA-Z0-9._]+@gmail\.com$').hasMatch(value)) return "Must end in @gmail.com";
+                          return null;
+                        },
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) return "Email is required";
-                        if (!RegExp(r'^[a-zA-Z0-9._]+@gmail\.com$').hasMatch(value)) return "Must end in @gmail.com";
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _passCtrl,
-                      obscureText: true,
-                      style: const TextStyle(fontSize: 14, color: textDark),
-                      decoration: InputDecoration(
-                        labelText: "Password", 
-                        labelStyle: const TextStyle(color: textLight),
-                        filled: true, fillColor: bgGray, 
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+                      const SizedBox(height: 16),
+                      
+                      const Text("Department", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textDark)),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        decoration: BoxDecoration(color: bgGray, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderGrey)),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedDept,
+                            isExpanded: true,
+                            icon: const Icon(Icons.keyboard_arrow_down, color: textLight),
+                            style: const TextStyle(color: textDark, fontWeight: FontWeight.w500, fontSize: 14),
+                            onChanged: (String? newValue) {
+                              setModalState(() => _selectedDept = newValue);
+                            },
+                            items: _lnuDepartments.map<DropdownMenuItem<String>>((String value) {
+                              return DropdownMenuItem<String>(value: value, child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis));
+                            }).toList(),
+                          ),
+                        ),
                       ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) return "Password is required";
-                        if (RegExp(r'[^\x00-\x7F]').hasMatch(value)) return "Cannot contain emojis";
-                        return null;
-                      },
-                    ),
-                  ],
+                      const SizedBox(height: 24),
+
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: borderGrey),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.security, size: 18, color: primaryBlue),
+                                SizedBox(width: 8),
+                                Text("Account Recovery Setup", style: TextStyle(color: primaryBlue, fontWeight: FontWeight.bold, fontSize: 13)),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            const Text("What is your favorite color?", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textDark)),
+                            const SizedBox(height: 6),
+                            TextFormField(
+                              controller: _colorCtrl,
+                              style: const TextStyle(fontSize: 14, color: textDark),
+                              decoration: InputDecoration(
+                                hintText: "e.g. Blue", hintStyle: const TextStyle(color: textLight, fontSize: 13),
+                                filled: true, fillColor: Colors.white,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderGrey)),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderGrey)),
+                              ),
+                              validator: (val) {
+                                if (val == null || val.trim().isEmpty) return "Color is required";
+                                if (RegExp(r'[^\x00-\x7F]').hasMatch(val)) return "Cannot contain emojis";
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            const Text("What is your favorite song?", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textDark)),
+                            const SizedBox(height: 6),
+                            TextFormField(
+                              controller: _songCtrl,
+                              style: const TextStyle(fontSize: 14, color: textDark),
+                              decoration: InputDecoration(
+                                hintText: "e.g. Bohemian Rhapsody", hintStyle: const TextStyle(color: textLight, fontSize: 13),
+                                filled: true, fillColor: Colors.white,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderGrey)),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderGrey)),
+                              ),
+                              validator: (val) {
+                                if (val == null || val.trim().isEmpty) return "Song is required";
+                                if (RegExp(r'[^\x00-\x7F]').hasMatch(val)) return "Cannot contain emojis";
+                                return null;
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      TextFormField(
+                        controller: _passCtrl,
+                        obscureText: _obscurePass,
+                        onChanged: (val) {
+                          _formKey.currentState?.validate();
+                          setModalState((){}); 
+                        }, 
+                        style: const TextStyle(fontSize: 14, color: textDark),
+                        decoration: InputDecoration(
+                          labelText: "Password", 
+                          labelStyle: const TextStyle(color: textLight),
+                          filled: true, fillColor: bgGray, 
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscurePass ? Icons.visibility_off : Icons.visibility, color: textLight, size: 20),
+                            onPressed: () => setModalState(() => _obscurePass = !_obscurePass),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) return "Password is required";
+                          if (!RegExp(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[\W_])[A-Za-z\d\W_]{8,12}$').hasMatch(value)) {
+                            return "8-12 chars, 1 Upper, 1 Lower, 1 Num, 1 Special";
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _confirmPassCtrl,
+                        obscureText: _obscureConfirm,
+                        onChanged: (val) {
+                          _formKey.currentState?.validate();
+                          setModalState((){}); 
+                        },
+                        style: const TextStyle(fontSize: 14, color: textDark),
+                        decoration: InputDecoration(
+                          labelText: "Confirm Password", 
+                          labelStyle: const TextStyle(color: textLight),
+                          filled: true, fillColor: bgGray, 
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: borderGrey)),
+                          helperText: (_confirmPassCtrl.text.isNotEmpty && _confirmPassCtrl.text == _passCtrl.text) ? "Password match" : null,
+                          helperStyle: TextStyle(color: Colors.green.shade600, fontWeight: FontWeight.bold, fontSize: 12),
+                          suffixIcon: IconButton(
+                            icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility, color: textLight, size: 20),
+                            onPressed: () => setModalState(() => _obscureConfirm = !_obscureConfirm),
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) return "Confirm your password";
+                          if (value != _passCtrl.text) return "Passwords do not match";
+                          return null;
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1450,25 +1733,28 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
                       setModalState(() => isSubmitting = true);
                       try {
                         final res = await http.post(
-                          Uri.parse('http://192.168.137.1:5000/api/admins/create'),
+                          Uri.parse('http://10.198.13.39:5000/api/admins/create'),
                           headers: {'Content-Type': 'application/json'},
                           body: jsonEncode({
                             'full_name': _nameCtrl.text.trim(),
                             'email': _emailCtrl.text.trim(),
+                            'department': _selectedDept,
                             'password': _passCtrl.text.trim(),
+                            'security_color': _colorCtrl.text.trim(),
+                            'security_song': _songCtrl.text.trim(),
                             'is_admin': true 
                           }),
                         );
                         if (res.statusCode == 201) {
                           if (context.mounted) Navigator.pop(ctx);
                           _fetchAdmins();
-                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Admin created successfully!")));
+                          if (mounted) _showTopNotification(context, "Admin created successfully!");
                         } else {
                           final data = jsonDecode(res.body);
-                          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: ${data['message']}")));
+                          if (mounted) _showTopNotification(context, "Error: ${data['message']}", isSuccess: false);
                         }
                       } catch (e) {
-                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Server Error: Unable to connect.")));
+                        if (mounted) _showTopNotification(context, "Server Error: Unable to connect.", isSuccess: false);
                       } finally {
                         setModalState(() => isSubmitting = false);
                       }
@@ -1490,7 +1776,6 @@ class _AdminManagementScreenState extends State<AdminManagementScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: textDark),
         title: const Text("Manage Admins", style: TextStyle(color: textDark, fontWeight: FontWeight.w800)),
         bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Container(color: borderGrey, height: 1)),
       ),

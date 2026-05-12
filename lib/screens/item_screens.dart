@@ -39,9 +39,14 @@ class DepartmentScreen extends StatefulWidget {
 class _DepartmentScreenState extends State<DepartmentScreen> {
   List items = []; 
   bool isLoading = true;
-  String? _currentFilter; 
+  String _currentFilter = 'All'; 
   String? _selectedDeptFilter; 
   final TextEditingController _searchCtrl = TextEditingController(); 
+  
+  // --- Lazy Loading Variables ---
+  final ScrollController _scrollController = ScrollController();
+  int _displayCount = 10;
+  bool _isLoadingMore = false;
   
   final List<String> _lnuDepartments = [
     'Bachelor of Elementary Education', 'Bachelor of Early Childhood Education', 'Bachelor of Special Needs Education', 'Bachelor of Technology and Livelihood Education', 'Bachelor of Physical Education', 'Bachelor of Secondary Education major in English', 'Bachelor of Secondary Education major in Filipino', 'Bachelor of Secondary Education major in Mathematics', 'Bachelor of Secondary Education major in Science', 'Bachelor of Secondary Education major in Social Studies', 'Bachelor of Secondary Education major in Values Education', 'Teacher Certificate Program (TCP)', 'Bachelor of Library and Information Science', 'Bachelor of Arts in Communication', 'Bachelor of Music in Music Education', 'Bachelor of Science in Information Technology', 'Bachelor of Arts in English Language', 'Bachelor of Arts in Political Science', 'Bachelor of Science in Biology', 'Bachelor of Science in Social Work', 'Bachelor of Science in Tourism Management', 'Bachelor of Science in Hospitality Management', 'Bachelor of Science in Entrepreneurship', 'Faculty / Staff'
@@ -52,22 +57,49 @@ class _DepartmentScreenState extends State<DepartmentScreen> {
     super.initState(); 
     _selectedDeptFilter = currentUser?['department'] ?? _lnuDepartments[0];
     _fetchDepartmentItems(); 
+
+    // --- Scroll Listener for Lazy Load ---
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 50) {
+        _loadMoreItems();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadMoreItems() async {
+    if (_isLoadingMore || _displayCount >= items.length) return;
+
+    setState(() => _isLoadingMore = true);
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    if (mounted) {
+      setState(() {
+        _displayCount += 10; 
+        _isLoadingMore = false;
+      });
+    }
   }
 
   Future<void> _fetchDepartmentItems() async {
-    setState(() => isLoading = true);
+    setState(() {
+      isLoading = true;
+      _displayCount = 10; // Reset lazy load on new fetch
+    });
     try {
-      String url = 'http://192.168.137.1:5000/api/items';
+      String url = 'http://10.198.13.39:5000/api/items';
       List<String> queryParams = [];
       
       if (_selectedDeptFilter != null) {
         queryParams.add('department=${Uri.encodeComponent(_selectedDeptFilter!)}');
       }
 
-      if (_currentFilter != null && _currentFilter != 'All') {
-        queryParams.add('status=$_currentFilter');
-      }
-      
+      // REMOVED status from query to fetch ALL items for real-time stats
       String searchQuery = _searchCtrl.text.trim();
       if (searchQuery.isNotEmpty) {
         queryParams.add('search=${Uri.encodeComponent(searchQuery)}');
@@ -88,8 +120,41 @@ class _DepartmentScreenState extends State<DepartmentScreen> {
     }
   }
 
+  // --- Helper widget for the Stats Dropdown ---
+  Widget _buildStatRow(String label, String count, Color color) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(width: 90, child: Text(label, style: const TextStyle(color: textDark, fontSize: 13, fontWeight: FontWeight.w600))),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+          child: Text(count, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
+        )
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // --- Calculate real-time stats instantly for the specific department ---
+    int totalItems = items.length;
+    int availableItems = items.where((item) => item['status']?.toString().toLowerCase() == 'available').length;
+    int borrowedItems = items.where((item) => item['status']?.toString().toLowerCase() == 'borrowed').length;
+
+    // --- Apply the local filter based on the dropdown ---
+    List<dynamic> filteredList = items;
+    if (_currentFilter == 'Available') {
+      filteredList = items.where((item) => item['status']?.toString().toLowerCase() == 'available').toList();
+    } else if (_currentFilter == 'Borrowed') {
+      filteredList = items.where((item) => item['status']?.toString().toLowerCase() == 'borrowed').toList();
+    }
+
+    // --- Slice the filtered list for Lazy Loading ---
+    List<dynamic> itemsToDisplay = filteredList.take(_displayCount).toList();
+    bool hasMoreData = itemsToDisplay.length < filteredList.length;
+
     return Scaffold(
       backgroundColor: bgGray,
       appBar: AppBar(
@@ -124,7 +189,7 @@ class _DepartmentScreenState extends State<DepartmentScreen> {
       drawer: const AppSidebar(),
       body: Stack(
         children: [
-          Positioned(top: -80, right: -60, child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withOpacity(0.03)))),
+          Positioned(top: -80, right: -60, child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withValues(alpha: 0.03)))),
           
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -136,24 +201,54 @@ class _DepartmentScreenState extends State<DepartmentScreen> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     const Text("Department", style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: textDark, letterSpacing: -0.5)),
+                    
+                    // --- NEW: The Stats Dropdown ---
                     Container(
-                      height: 32,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: borderGrey), borderRadius: BorderRadius.circular(16)),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _currentFilter,
-                          hint: const Text("All Status", style: TextStyle(fontSize: 13, color: textDark, fontWeight: FontWeight.w600)),
-                          icon: const Icon(Icons.keyboard_arrow_down, size: 16, color: textLight),
-                          alignment: Alignment.centerRight,
-                          items: ['Available', 'Borrowed'].map((String value) {
-                            return DropdownMenuItem<String>(value: value, child: Text(value, style: const TextStyle(fontSize: 13, color: textDark, fontWeight: FontWeight.w600)));
-                          }).toList(),
-                          onChanged: (newValue) {
-                            setState(() => _currentFilter = newValue);
-                            _fetchDepartmentItems();
-                          },
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: borderGrey),
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 4, offset: const Offset(0, 2))],
+                      ),
+                      child: PopupMenuButton<String>(
+                        offset: const Offset(0, 40),
+                        color: Colors.white,
+                        surfaceTintColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        onSelected: (String newValue) {
+                          setState(() {
+                            _currentFilter = newValue;
+                            _displayCount = 10; 
+                          });
+                        },
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          child: Row(
+                            children: [
+                              Icon(Icons.analytics_outlined, size: 18, color: primaryBlue),
+                              SizedBox(width: 6),
+                              Text("Stats", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+                              SizedBox(width: 4),
+                              Icon(Icons.keyboard_arrow_down, size: 18, color: textLight),
+                            ],
+                          ),
                         ),
+                        itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                          PopupMenuItem<String>(
+                            value: 'All', 
+                            child: _buildStatRow("Total Items", totalItems.toString(), Colors.blueGrey),
+                          ),
+                          const PopupMenuDivider(),
+                          PopupMenuItem<String>(
+                            value: 'Available',
+                            child: _buildStatRow("Available", availableItems.toString(), Colors.green.shade600),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'Borrowed',
+                            child: _buildStatRow("Borrowed", borrowedItems.toString(), Colors.orange.shade700),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -184,7 +279,7 @@ class _DepartmentScreenState extends State<DepartmentScreen> {
               Expanded(
                 child: isLoading 
                   ? const Center(child: CircularProgressIndicator(color: primaryBlue)) 
-                  : items.isEmpty 
+                  : itemsToDisplay.isEmpty 
                       ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -200,10 +295,19 @@ class _DepartmentScreenState extends State<DepartmentScreen> {
                           ),
                         )
                       : ListView.builder(
+                          controller: _scrollController, 
                           physics: const BouncingScrollPhysics(),
                           padding: const EdgeInsets.only(bottom: 24),
-                          itemCount: items.length,
-                          itemBuilder: (c, i) => _DeptItemCard(item: items[i]),
+                          itemCount: itemsToDisplay.length + (hasMoreData ? 1 : 0),
+                          itemBuilder: (c, i) {
+                            if (i == itemsToDisplay.length) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 24),
+                                child: Center(child: CircularProgressIndicator(color: primaryBlue)),
+                              );
+                            }
+                            return _DeptItemCard(item: itemsToDisplay[i]);
+                          },
                         ),
               ),
             ],
@@ -232,7 +336,7 @@ class _DeptItemCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: borderGrey),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -297,7 +401,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Future<void> _fetchFavorites() async {
     setState(() => isLoading = true);
     try {
-      final res = await http.get(Uri.parse('http://192.168.137.1:5000/api/favorites/${currentUser!['id']}'));
+      final res = await http.get(Uri.parse('http://10.198.13.39:5000/api/favorites/${currentUser!['id']}'));
       if (res.statusCode == 200) {
         setState(() => items = jsonDecode(res.body));
       }
@@ -311,7 +415,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Future<void> _unfavorite(int itemId) async {
     try {
       await http.post(
-        Uri.parse('http://192.168.137.1:5000/api/favorites/toggle'),
+        Uri.parse('http://10.198.13.39:5000/api/favorites/toggle'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': currentUser!['id'], 'item_id': itemId}),
       );
@@ -335,7 +439,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       drawer: const AppSidebar(),
       body: Stack(
         children: [
-          Positioned(top: -80, right: -60, child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withOpacity(0.03)))),
+          Positioned(top: -80, right: -60, child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withValues(alpha: 0.03)))),
           
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -394,7 +498,7 @@ class _FavoriteCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderGrey),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -461,7 +565,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
   Future<void> _checkIfFavorited() async {
     try {
       final res = await http.post(
-        Uri.parse('http://192.168.137.1:5000/api/favorites/check'), 
+        Uri.parse('http://10.198.13.39:5000/api/favorites/check'), 
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': currentUser!['id'], 'item_id': widget.item['id']}),
       );
@@ -476,7 +580,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
   Future<void> _toggleFavorite() async {
     try {
       final res = await http.post(
-        Uri.parse('http://192.168.137.1:5000/api/favorites/toggle'), 
+        Uri.parse('http://10.198.13.39:5000/api/favorites/toggle'), 
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': currentUser!['id'], 'item_id': widget.item['id']}),
       );
@@ -520,7 +624,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(color: borderGrey, width: 1),
                       image: safeImg != null ? DecorationImage(image: safeImg, fit: BoxFit.cover) : null,
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 10))],
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, 10))],
                     ),
                     child: safeImg == null ? const Icon(Icons.image_outlined, size: 64, color: textLight) : null,
                   ),
@@ -532,7 +636,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: Colors.white, shape: BoxShape.circle, border: Border.all(color: borderGrey),
-                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
+                          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 4))],
                         ),
                         child: Icon(_isFavorited ? Icons.favorite : Icons.favorite_border, color: _isFavorited ? Colors.red : textLight, size: 24),
                       ),
@@ -548,7 +652,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: borderGrey),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))]
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))]
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -615,7 +719,7 @@ class _DetailedItemScreenState extends State<DetailedItemScreen> {
   Widget _detailLabel(String t) => Text(t, style: const TextStyle(color: textLight, fontWeight: FontWeight.w600, fontSize: 12, letterSpacing: 0.5));
   Widget _detailValue(String v, {bool isLight = false}) => Padding(
     padding: const EdgeInsets.only(top: 6),
-    child: Text(v, style: TextStyle(color: isLight ? textDark.withOpacity(0.8) : textDark, fontWeight: isLight ? FontWeight.w500 : FontWeight.bold, fontSize: 15, height: 1.4)),
+    child: Text(v, style: TextStyle(color: isLight ? textDark.withValues(alpha: 0.8) : textDark, fontWeight: isLight ? FontWeight.w500 : FontWeight.bold, fontSize: 15, height: 1.4)),
   );
 }
 
@@ -639,7 +743,7 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
   Future<void> _fetchMyItems() async {
     setState(() => isLoading = true);
     try {
-      final res = await http.get(Uri.parse('http://192.168.137.1:5000/api/items/user/${currentUser!['id']}'));
+      final res = await http.get(Uri.parse('http://10.198.13.39:5000/api/items/user/${currentUser!['id']}'));
       if (res.statusCode == 200) {
         setState(() => items = jsonDecode(res.body));
       }
@@ -652,7 +756,7 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
 
   Future<void> _deleteItem(int id) async {
     try {
-      await http.delete(Uri.parse('http://192.168.137.1:5000/api/items/$id'));
+      await http.delete(Uri.parse('http://10.198.13.39:5000/api/items/$id'));
       _fetchMyItems();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Delete failed")));
@@ -693,7 +797,7 @@ class _MyItemsScreenState extends State<MyItemsScreen> {
       drawer: const AppSidebar(),
       body: Stack(
         children: [
-          Positioned(top: -80, right: -60, child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withOpacity(0.03)))),
+          Positioned(top: -80, right: -60, child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: primaryBlue.withValues(alpha: 0.03)))),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -778,7 +882,7 @@ class _MyItemCardState extends State<_MyItemCard> {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderGrey),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -926,7 +1030,7 @@ class _EditItemScreenState extends State<EditItemScreen> {
     setState(() => _isUpdating = true);
     try {
       await http.put(
-        Uri.parse('http://192.168.137.1:5000/api/items/${widget.item['id']}'),
+        Uri.parse('http://10.198.13.39:5000/api/items/${widget.item['id']}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'title': titleText,
@@ -993,7 +1097,7 @@ class _EditItemScreenState extends State<EditItemScreen> {
             _formLabel("Owner"),
             Padding(padding: const EdgeInsets.only(left: 4, bottom: 12), child: Text(widget.item['owner'], style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: textLight))),
             
-            // --- NEW: Display Department as uneditable text ---
+            // --- Display Department as uneditable text ---
             _formLabel("Department"),
             Padding(padding: const EdgeInsets.only(left: 4, bottom: 12), child: Text(widget.item['dept'], style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: textLight))),
 
@@ -1095,7 +1199,7 @@ class _AddItemScreenState extends State<AddItemScreen> {
     setState(() => _isPosting = true);
     try {
       final res = await http.post(
-        Uri.parse('http://192.168.137.1:5000/api/items'),
+        Uri.parse('http://10.198.13.39:5000/api/items'),
         headers: {'Content-Type': 'application/json'},  
         body: jsonEncode({
           'title': titleText,

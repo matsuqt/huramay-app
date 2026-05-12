@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
-import 'package:firebase_messaging/firebase_messaging.dart'; 
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../widgets/app_sidebar.dart';
 import '../utils/ui_helpers.dart';
@@ -29,14 +29,48 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   List items = []; 
   bool isLoading = true;
-  String? _currentFilter; 
+  String _currentFilter = 'All'; // Default filter set to 'All' to match Admin side
   final TextEditingController _searchCtrl = TextEditingController(); 
+
+  // --- Lazy Loading Variables ---
+  final ScrollController _scrollController = ScrollController();
+  int _displayCount = 10;
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
     super.initState();
     _fetchItems();
     _setupFCMToken(); 
+
+    // --- Scroll Listener to detect when user hits the bottom ---
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 50) {
+        _loadMoreItems();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // --- Load More Function ---
+  Future<void> _loadMoreItems() async {
+    if (_isLoadingMore || _displayCount >= items.length) return;
+
+    setState(() => _isLoadingMore = true);
+
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    if (mounted) {
+      setState(() {
+        _displayCount += 10; 
+        _isLoadingMore = false;
+      });
+    }
   }
 
   ImageProvider? _getSafeImage(String? base64Str) {
@@ -57,7 +91,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (token != null && currentUser != null) {
         debugPrint("📱 FIREBASE DEVICE TOKEN: $token"); 
         await http.post(
-          Uri.parse('http://192.168.137.1:5000/api/user/update_token'),
+          Uri.parse('http://10.198.13.39:5000/api/user/update_token'),
           headers: {'Content-Type': 'application/json'},
           body: jsonEncode({
             'user_id': currentUser!['id'],
@@ -71,15 +105,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _fetchItems() async {
-    setState(() => isLoading = true);
+    setState(() {
+      isLoading = true;
+      _displayCount = 10; 
+    });
+    
     try {
-      String url = 'http://192.168.137.1:5000/api/items';
+      String url = 'http://10.198.13.39:5000/api/items';
       List<String> queryParams = [];
       
-      if (_currentFilter != null && _currentFilter != 'All') {
-        queryParams.add('status=$_currentFilter');
-      }
-      
+      // Removed the backend status filter so we fetch ALL items 
+      // and do local filtering to generate accurate real-time stats
       String searchQuery = _searchCtrl.text.trim();
       if (searchQuery.isNotEmpty) {
         queryParams.add('search=${Uri.encodeComponent(searchQuery)}');
@@ -100,9 +136,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  // --- NEW: Helper widget for the Stats Dropdown ---
+  Widget _buildStatRow(String label, String count, Color color) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(width: 90, child: Text(label, style: const TextStyle(color: textDark, fontSize: 13, fontWeight: FontWeight.w600))),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+          child: Text(count, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
+        )
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     ImageProvider? profileImg = _getSafeImage(currentUser?['photo_path']);
+
+    // --- NEW: Calculate real-time stats instantly ---
+    int totalItems = items.length;
+    int availableItems = items.where((item) => item['status']?.toString().toLowerCase() == 'available').length;
+    int borrowedItems = items.where((item) => item['status']?.toString().toLowerCase() == 'borrowed').length;
+
+    // --- Apply the local filter based on the dropdown ---
+    List<dynamic> filteredList = items;
+    if (_currentFilter == 'Available') {
+      filteredList = items.where((item) => item['status']?.toString().toLowerCase() == 'available').toList();
+    } else if (_currentFilter == 'Borrowed') {
+      filteredList = items.where((item) => item['status']?.toString().toLowerCase() == 'borrowed').toList();
+    }
+
+    // --- Slice the filtered list for Lazy Loading ---
+    List<dynamic> itemsToDisplay = filteredList.take(_displayCount).toList();
+    bool hasMoreData = itemsToDisplay.length < filteredList.length;
 
     return Scaffold(
       backgroundColor: bgGray,
@@ -208,31 +277,54 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         letterSpacing: -0.5,
                       ),
                     ),
+                    
+                    // --- NEW: The Admin-style Stats Dropdown ---
                     Container(
-                      height: 32,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      height: 36,
                       decoration: BoxDecoration(
                         color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: borderGrey),
-                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2))],
                       ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _currentFilter,
-                          hint: const Text("All Items", style: TextStyle(fontSize: 13, color: textDark, fontWeight: FontWeight.w600)),
-                          icon: const Icon(Icons.keyboard_arrow_down, size: 16, color: textLight),
-                          alignment: Alignment.centerRight,
-                          items: ['Available', 'Borrowed'].map((String value) {
-                            return DropdownMenuItem<String>(
-                              value: value,
-                              child: Text(value, style: const TextStyle(fontSize: 13, color: textDark, fontWeight: FontWeight.w600)),
-                            );
-                          }).toList(),
-                          onChanged: (newValue) {
-                            setState(() => _currentFilter = newValue);
-                            _fetchItems();
-                          },
+                      child: PopupMenuButton<String>(
+                        offset: const Offset(0, 40),
+                        color: Colors.white,
+                        surfaceTintColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        onSelected: (String newValue) {
+                          setState(() {
+                            _currentFilter = newValue;
+                            _displayCount = 10; // Reset lazy load when changing tabs
+                          });
+                        },
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          child: Row(
+                            children: [
+                              Icon(Icons.analytics_outlined, size: 18, color: primaryBlue),
+                              SizedBox(width: 6),
+                              Text("Stats", style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: textDark)),
+                              SizedBox(width: 4),
+                              Icon(Icons.keyboard_arrow_down, size: 18, color: textLight),
+                            ],
+                          ),
                         ),
+                        itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                          PopupMenuItem<String>(
+                            value: 'All', 
+                            child: _buildStatRow("Total Items", totalItems.toString(), Colors.blueGrey),
+                          ),
+                          const PopupMenuDivider(),
+                          PopupMenuItem<String>(
+                            value: 'Available',
+                            child: _buildStatRow("Available", availableItems.toString(), Colors.green.shade600),
+                          ),
+                          PopupMenuItem<String>(
+                            value: 'Borrowed',
+                            child: _buildStatRow("Borrowed", borrowedItems.toString(), Colors.orange.shade700),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -241,13 +333,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Expanded(
                 child: isLoading 
                   ? const Center(child: CircularProgressIndicator(color: primaryBlue)) 
-                  : items.isEmpty 
+                  : itemsToDisplay.isEmpty 
                       ? _emptyStateDashboard() 
                       : ListView.builder(
+                          controller: _scrollController, 
                           physics: const BouncingScrollPhysics(),
                           padding: const EdgeInsets.only(bottom: 100, top: 8), 
-                          itemCount: items.length,
-                          itemBuilder: (c, i) => _itemCard(context, items[i]),
+                          itemCount: itemsToDisplay.length + (hasMoreData ? 1 : 0), 
+                          itemBuilder: (c, i) {
+                            if (i == itemsToDisplay.length) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 24),
+                                child: Center(child: CircularProgressIndicator(color: primaryBlue)),
+                              );
+                            }
+                            return _itemCard(context, itemsToDisplay[i]);
+                          },
                         ),
               ),
             ],
@@ -312,7 +413,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _itemCard(BuildContext context, dynamic item) {
     ImageProvider? safeImg = _getSafeImage(item['image']);
     
-    // --- NEW: Sync dashboard colors to Admin side colors ---
     String statusStr = item['status']?.toString().toLowerCase() ?? '';
     bool isAvailable = statusStr == 'available';
     bool isBorrowed = statusStr == 'borrowed';
