@@ -41,7 +41,7 @@ class _AppSidebarState extends State<AppSidebar> {
   Future<void> _fetchUnreadCount() async {
     if (currentUser == null) return;
     try {
-      final res = await http.get(Uri.parse('http://192.168.137.1:5000/api/messages/unread/${currentUser!['id']}'));
+      final res = await http.get(Uri.parse('http://10.198.13.39:5000/api/messages/unread/${currentUser!['id']}'));
       if (res.statusCode == 200) {
         if (mounted) {
           setState(() {
