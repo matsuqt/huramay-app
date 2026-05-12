@@ -27,6 +27,9 @@ def create_admin():
     full_name_input = data.get('full_name', '')
     email_input = data.get('email', '')
     password_input = data.get('password', '')
+    department_input = data.get('department', 'Faculty / Staff')
+    color_input = data.get('security_color', '').strip().lower()
+    song_input = data.get('security_song', '').strip()
     
     if not re.match(r'^[a-zA-Z\s.]+$', full_name_input):
         return jsonify({"message": "Full name can only contain letters, spaces, and periods."}), 400
@@ -34,8 +37,11 @@ def create_admin():
     if not re.match(r'^[a-zA-Z0-9._]+@gmail\.com$', email_input):
         return jsonify({"message": "Email must be a valid @gmail.com address without emojis."}), 400
         
-    if re.search(r'[^\x00-\x7F]', password_input):
-        return jsonify({"message": "Password cannot contain emojis."}), 400
+    if len(password_input) < 8 or len(password_input) > 12:
+        return jsonify({"message": "Password must be 8-12 characters long."}), 400
+
+    if not color_input or not song_input:
+        return jsonify({"message": "Account recovery color and song are required."}), 400
 
     if User.query.filter_by(email=email_input).first():
         return jsonify({"message": "Email already registered"}), 400
@@ -44,9 +50,11 @@ def create_admin():
     new_admin = User(
         full_name=full_name_input, 
         email=email_input, 
-        department="Admin", 
+        department=department_input, 
         password=hashed_pass, 
-        is_admin=True
+        is_admin=True,
+        security_color=color_input,
+        security_song=song_input
     )
     db.session.add(new_admin)
     db.session.commit()
@@ -128,7 +136,7 @@ def hard_delete_user(user_id):
         db.session.rollback()
         return jsonify({"message": "Error deleting user", "error": str(e)}), 500
 
-# ==================== UPDATED: GET ALL USERS (NO PAGINATION) ====================
+# ==================== GET ALL USERS (NO PAGINATION) ====================
 @admin_bp.route('/api/users', methods=['GET'])
 def get_all_users():
     try:
